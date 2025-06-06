@@ -76,7 +76,7 @@ class Memory(adal.core.component.DataComponent):
                 # Try to initialize it
                 self.current_conversation.dialog_turns = []
         except Exception as e:
-            logger.error(f"Error accessing dialog turns: {str(e)}")
+            logger.error("Error accessing dialog turns", e)
             # Try to recover
             try:
                 self.current_conversation = CustomConversation()
@@ -123,7 +123,7 @@ class Memory(adal.core.component.DataComponent):
             return True
 
         except Exception as e:
-            logger.error(f"Error adding dialog turn: {str(e)}")
+            logger.error("Error adding dialog turn", e)
             # Try to recover by creating a new conversation
             try:
                 self.current_conversation = CustomConversation()
@@ -230,7 +230,7 @@ class RAG(adal.Component):
         # Initialize components
         self.memory = Memory()
         self.embedder = get_embedder(is_local_ollama=self.is_ollama_embedder)
-
+        logger.info(f"Embedder: {self.embedder}")
         # Patch: ensure query embedding is always single string for Ollama
         def single_string_embedder(query):
             # Accepts either a string or a list, always returns embedding for a single string
@@ -296,6 +296,9 @@ IMPORTANT FORMATTING RULES:
         Returns:
             List of documents with valid embeddings of consistent size
         """
+        logger.info(f"=== EMBEDDING VALIDATION DEBUG ===")
+        logger.info(f"Total documents to validate: {len(documents)}")
+        
         if not documents:
             logger.warning("No documents provided for embedding validation")
             return []
@@ -304,6 +307,7 @@ IMPORTANT FORMATTING RULES:
         embedding_sizes = {}
 
         # First pass: collect all embedding sizes and count occurrences
+        logger.info("=== FIRST PASS: Collecting embedding sizes ===")
         for i, doc in enumerate(documents):
             if not hasattr(doc, 'vector') or doc.vector is None:
                 logger.warning(f"Document {i} has no embedding vector, skipping")
@@ -312,24 +316,38 @@ IMPORTANT FORMATTING RULES:
             try:
                 if isinstance(doc.vector, list):
                     embedding_size = len(doc.vector)
+                    logger.debug(f"Document {i}: List vector with size {embedding_size}")
                 elif hasattr(doc.vector, 'shape'):
                     embedding_size = doc.vector.shape[0] if len(doc.vector.shape) == 1 else doc.vector.shape[-1]
+                    logger.debug(f"Document {i}: Array vector with shape {doc.vector.shape}, size {embedding_size}")
                 elif hasattr(doc.vector, '__len__'):
                     embedding_size = len(doc.vector)
+                    logger.debug(f"Document {i}: Vector with __len__, size {embedding_size}")
                 else:
                     logger.warning(f"Document {i} has invalid embedding vector type: {type(doc.vector)}, skipping")
                     continue
 
                 if embedding_size == 0:
                     logger.warning(f"Document {i} has empty embedding vector, skipping")
+                    # Let's also check what the actual vector looks like
+                    try:
+                        vector_info = f"type: {type(doc.vector)}, length: {len(doc.vector) if hasattr(doc.vector, '__len__') else 'unknown'}"
+                        logger.warning(f"  - Vector info: {vector_info}")
+                    except Exception as ve:
+                        logger.warning(f"  - Vector info error: {ve}")
+                    if hasattr(doc, 'meta_data') and doc.meta_data is not None:
+                        file_path = doc.meta_data.get('file_path', 'unknown')
+                        logger.warning(f"  - File path: {file_path}")
                     continue
 
                 embedding_sizes[embedding_size] = embedding_sizes.get(embedding_size, 0) + 1
 
             except Exception as e:
-                logger.warning(f"Error checking embedding size for document {i}: {str(e)}, skipping")
+                logger.warning(f"Error checking embedding size for document {i}, skipping", e)
                 continue
 
+        logger.info(f"Embedding sizes found: {embedding_sizes}")
+        
         if not embedding_sizes:
             logger.error("No valid embeddings found in any documents")
             return []
@@ -344,6 +362,7 @@ IMPORTANT FORMATTING RULES:
                 logger.warning(f"Found {count} documents with incorrect embedding size {size}, will be filtered out")
 
         # Second pass: filter documents with the target embedding size
+        logger.info("=== SECOND PASS: Filtering documents ===")
         for i, doc in enumerate(documents):
             if not hasattr(doc, 'vector') or doc.vector is None:
                 continue
@@ -367,7 +386,7 @@ IMPORTANT FORMATTING RULES:
 
             except Exception as e:
                 file_path = getattr(doc, 'meta_data', {}).get('file_path', f'document_{i}')
-                logger.warning(f"Error validating embedding for document '{file_path}': {str(e)}, skipping")
+                logger.warning(f"Error validating embedding for document '{file_path}', skipping", e)
                 continue
 
         logger.info(f"Embedding validation complete: {len(valid_documents)}/{len(documents)} documents have valid embeddings")
@@ -395,6 +414,11 @@ IMPORTANT FORMATTING RULES:
             included_dirs: Optional list of directories to include exclusively
             included_files: Optional list of file patterns to include exclusively
         """
+        logger.info(f"=== PREPARE RETRIEVER DEBUG ===")
+        logger.info(f"Repository: {repo_url_or_path}")
+        logger.info(f"Type: {type}")
+        logger.info(f"Using Ollama embedder: {self.is_ollama_embedder}")
+        
         self.initialize_db_manager()
         self.repo_url_or_path = repo_url_or_path
         self.transformed_docs = self.db_manager.prepare_database(
@@ -408,6 +432,23 @@ IMPORTANT FORMATTING RULES:
             included_files=included_files
         )
         logger.info(f"Loaded {len(self.transformed_docs)} documents for retrieval")
+        
+        # Debug: Check first few documents before validation
+        logger.info(f"=== DOCUMENTS BEFORE VALIDATION ===")
+        for i, doc in enumerate(self.transformed_docs[:3]):  # Check first 3 docs
+            logger.info(f"Document {i}:")
+            logger.info(f"  - Has vector attribute: {hasattr(doc, 'vector')}")
+            if hasattr(doc, 'vector'):
+                logger.info(f"  - Vector is None: {doc.vector is None}")
+                if doc.vector is not None:
+                    if isinstance(doc.vector, list):
+                        logger.info(f"  - Vector length: {len(doc.vector)}")
+                        logger.info(f"  - First few values: {doc.vector[:5] if len(doc.vector) > 0 else 'empty'}")
+                    elif hasattr(doc.vector, 'shape'):
+                        logger.info(f"  - Vector shape: {doc.vector.shape}")
+            if hasattr(doc, 'meta_data') and doc.meta_data is not None:
+                file_path = doc.meta_data.get('file_path', 'unknown')
+                logger.info(f"  - File path: {file_path}")
 
         # Validate and filter embeddings to ensure consistent sizes
         self.transformed_docs = self._validate_and_filter_embeddings(self.transformed_docs)
@@ -428,7 +469,7 @@ IMPORTANT FORMATTING RULES:
             )
             logger.info("FAISS retriever created successfully")
         except Exception as e:
-            logger.error(f"Error creating FAISS retriever: {str(e)}")
+            logger.error("Error creating FAISS retriever", e)
             # Try to provide more specific error information
             if "All embeddings should be of the same size" in str(e):
                 logger.error("Embedding size validation failed. This suggests there are still inconsistent embedding sizes.")
@@ -473,7 +514,7 @@ IMPORTANT FORMATTING RULES:
             return retrieved_documents
 
         except Exception as e:
-            logger.error(f"Error in RAG call: {str(e)}")
+            logger.error(f"Error in RAG call", e)
 
             # Create error response
             error_response = RAGAnswer(

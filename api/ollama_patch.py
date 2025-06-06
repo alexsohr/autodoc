@@ -52,7 +52,7 @@ class OllamaDocumentProcessor(DataComponent):
                     logger.warning(f"Failed to get embedding for document '{file_path}', skipping")
             except Exception as e:
                 file_path = getattr(doc, 'meta_data', {}).get('file_path', f'document_{i}')
-                logger.error(f"Error processing document '{file_path}': {e}, skipping")
+                logger.error(f"Error processing document '{file_path}', skipping", e)
 
         logger.info(f"Successfully processed {len(successful_docs)}/{len(output)} documents with consistent embeddings")
         return successful_docs
