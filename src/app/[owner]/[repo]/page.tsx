@@ -89,7 +89,7 @@ const wikiStyles = `
 
 // Helper function to generate cache key for localStorage
 const getCacheKey = (owner: string, repo: string, repoType: string, language: string, isComprehensive: boolean = true): string => {
-  return `deepwiki_cache_${repoType}_${owner}_${repo}_${language}_${isComprehensive ? 'comprehensive' : 'concise'}`;
+  return `autodoc_cache_${repoType}_${owner}_${repo}_${language}_${isComprehensive ? 'comprehensive' : 'concise'}`;
 };
 
 // Helper function to add tokens and other parameters to request body
@@ -1989,7 +1989,7 @@ IMPORTANT:
       <footer className="max-w-[90%] xl:max-w-[1400px] mx-auto mt-8 flex flex-col gap-4 w-full">
         <div className="flex justify-between items-center gap-4 text-center text-[var(--muted)] text-sm h-fit w-full bg-[var(--card-bg)] rounded-lg p-3 shadow-sm border border-[var(--border-color)]">
           <p className="flex-1 font-serif">
-            {messages.footer?.copyright || 'DeepWiki - Generate Wiki from GitHub/Gitlab/Bitbucket repositories'}
+            {messages.footer?.copyright || 'AutoDoc - Generate Wiki from GitHub/Gitlab/Bitbucket repositories'}
           </p>
           <ThemeToggle />
         </div>
