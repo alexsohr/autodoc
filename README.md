@@ -14,7 +14,7 @@
 [![Twitter/X](https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://x.com/sashimikun_void)
 [![Discord](https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/VQMBGR8u5v)
 
-[English](./README.md) | [简体中文](./README.zh.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.kr.md) | [Tiếng Việt](./README.vi.md)
+[English](./README.md)
 
 ## ✨ Features
 
@@ -33,7 +33,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/AsyncFuncAI/deepwiki-open.git
+git clone https://github.com/alexsohr/deepwiki-open.git
 cd deepwiki-open
 
 # Create a .env file with your API keys
@@ -326,7 +326,7 @@ You can use Docker to run DeepWiki:
 
 ```bash
 # Pull the image from GitHub Container Registry
-docker pull ghcr.io/asyncfuncai/deepwiki-open:latest
+docker pull ghcr.io/alexsohr/deepwiki-open:latest
 
 # Run the container with environment variables
 docker run -p 8001:8001 -p 3000:3000 \
@@ -335,7 +335,7 @@ docker run -p 8001:8001 -p 3000:3000 \
   -e OPENROUTER_API_KEY=your_openrouter_api_key \
   -e OLLAMA_HOST=your_ollama_host \
   -v ~/.adalflow:/root/.adalflow \
-  ghcr.io/asyncfuncai/deepwiki-open:latest
+  ghcr.io/alexsohr/deepwiki-open:latest
 ```
 
 This command also mounts `~/.adalflow` on your host to `/root/.adalflow` in the container. This path is used to store:
@@ -369,7 +369,7 @@ echo "OLLAMA_HOST=your_ollama_host" >> .env
 docker run -p 8001:8001 -p 3000:3000 \
   -v $(pwd)/.env:/app/.env \
   -v ~/.adalflow:/root/.adalflow \
-  ghcr.io/asyncfuncai/deepwiki-open:latest
+  ghcr.io/alexsohr/deepwiki-open:latest
 ```
 
 This command also mounts `~/.adalflow` on your host to `/root/.adalflow` in the container. This path is used to store:
@@ -385,7 +385,7 @@ If you want to build the Docker image locally:
 
 ```bash
 # Clone the repository
-git clone https://github.com/AsyncFuncAI/deepwiki-open.git
+git clone https://github.com/alexsohr/deepwiki-open.git
 cd deepwiki-open
 
 # Build the Docker image
@@ -508,4 +508,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=AsyncFuncAI/deepwiki-open&type=Date)](https://star-history.com/#AsyncFuncAI/deepwiki-open&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=alexsohr/deepwiki-open&type=Date)](https://star-history.com/#alexsohr/deepwiki-open&Date)

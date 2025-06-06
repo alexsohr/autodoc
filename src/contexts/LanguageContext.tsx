@@ -33,33 +33,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       const browserLang = navigator.language || (navigator as any).userLanguage || '';
       console.log('Detected browser language:', browserLang);
 
-      if (!browserLang) {
-        return 'en'; // Default to English if browser language is not available
-      }
-
-      // Extract the language code (first 2 characters)
-      const langCode = browserLang.split('-')[0].toLowerCase();
-      console.log('Extracted language code:', langCode);
-
-      // Check if the detected language is supported
-      if (locales.includes(langCode as any)) {
-        console.log('Language supported, using:', langCode);
-        return langCode;
-      }
-
-      // Special case for Chinese variants
-      if (langCode === 'zh') {
-        console.log('Chinese language detected');
-        // Check for traditional Chinese variants
-        if (browserLang.includes('TW') || browserLang.includes('HK')) {
-          console.log('Traditional Chinese variant detected');
-          return 'zh'; // Use Mandarin for traditional Chinese
-        }
-        return 'zh'; // Use Mandarin for simplified Chinese
-      }
-
-      console.log('Language not supported, defaulting to English');
-      return 'en'; // Default to English if not supported
+      return 'en'; // Default to English if browser language is not available
+  
     } catch (error) {
       console.error('Error detecting browser language:', error);
       return 'en'; // Default to English on error
