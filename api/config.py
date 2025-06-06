@@ -66,12 +66,23 @@ def replace_env_placeholders(config: Union[Dict[str, Any], List[Any], str, Any])
         env_var_name = match.group(1)
         original_placeholder = match.group(0)
         env_var_value = os.environ.get(env_var_name)
+        
+        logger.debug(f"=== ENV PLACEHOLDER DEBUG ===")
+        logger.debug(f"Found placeholder: {original_placeholder}")
+        logger.debug(f"Environment variable name: {env_var_name}")
+        logger.debug(f"Environment variable value found: {bool(env_var_value)}")
+        if env_var_value:
+            logger.debug(f"Environment variable starts with sk-: {env_var_value.startswith('sk-')}")
+            logger.debug(f"Environment variable length: {len(env_var_value)}")
+        
         if env_var_value is None:
             logger.warning(
                 f"Environment variable placeholder '{original_placeholder}' was not found in the environment. "
                 f"The placeholder string will be used as is."
             )
             return original_placeholder
+        
+        logger.debug(f"Replacing {original_placeholder} with environment variable value")
         return env_var_value
 
     if isinstance(config, dict):
@@ -79,7 +90,10 @@ def replace_env_placeholders(config: Union[Dict[str, Any], List[Any], str, Any])
     elif isinstance(config, list):
         return [replace_env_placeholders(item) for item in config]
     elif isinstance(config, str):
-        return pattern.sub(replacer, config)
+        replaced = pattern.sub(replacer, config)
+        if "${" in config:
+            logger.debug(f"String replacement: '{config}' -> '{replaced}'")
+        return replaced
     else:
         # Handles numbers, booleans, None, etc.
         return config
@@ -105,7 +119,7 @@ def load_json_config(filename):
             config = replace_env_placeholders(config)
             return config
     except Exception as e:
-        logger.error(f"Error loading configuration file {filename}: {str(e)}")
+        logger.error(f"Error loading configuration file {filename}", e)
         return {}
 
 # Load generator model configuration
@@ -136,14 +150,24 @@ def load_generator_config():
 # Load embedder configuration
 def load_embedder_config():
     embedder_config = load_json_config("embedder.json")
+    
+    logger.debug(f"=== EMBEDDER CONFIG DEBUG ===")
+    logger.debug(f"Raw embedder config loaded: {embedder_config}")
 
     # Process client classes
     for key in ["embedder", "embedder_ollama"]:
         if key in embedder_config and "client_class" in embedder_config[key]:
+            logger.debug(f"Processing embedder config for key: {key}")
             class_name = embedder_config[key]["client_class"]
+            logger.debug(f"Client class name: {class_name}")
             if class_name in CLIENT_CLASSES:
                 embedder_config[key]["model_client"] = CLIENT_CLASSES[class_name]
+                logger.debug(f"Set model_client for {key}")
+            
+            # Log the final config for this key
+            logger.debug(f"Final config for {key}: {embedder_config[key]}")
 
+    logger.debug(f"Final embedder config: {embedder_config}")
     return embedder_config
 
 def get_embedder_config():
@@ -256,9 +280,13 @@ if generator_config:
 
 # Update embedder configuration
 if embedder_config:
+    logger.debug(f"=== UPDATING GLOBAL CONFIGS ===")
+    logger.debug(f"Embedder config to merge: {embedder_config}")
     for key in ["embedder", "embedder_ollama", "retriever", "text_splitter"]:
         if key in embedder_config:
+            logger.debug(f"Setting configs[{key}] = {embedder_config[key]}")
             configs[key] = embedder_config[key]
+    logger.debug(f"Global configs after embedder update: {configs}")
 
 # Update repository configuration
 if repo_config:

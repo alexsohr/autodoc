@@ -23,8 +23,7 @@
       }
     },
     "openai": {
-      "default_model": "gpt-4.1",
-      "supportsCustomModel": true,
+      "default_model": "gpt-4.1",      "supportsCustomModel": true,
       "models": {
         "gpt-4o": {
           "temperature": 0.7,

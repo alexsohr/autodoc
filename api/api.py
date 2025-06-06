@@ -190,7 +190,7 @@ async def get_model_config():
         return config
 
     except Exception as e:
-        logger.error(f"Error creating model configuration: {str(e)}")
+        logger.error(f"Error creating model configuration", e)
         # Return some default configuration in case of error
         return ModelConfig(
             providers=[
@@ -250,8 +250,8 @@ async def export_wiki(request: WikiExportRequest):
         return response
 
     except Exception as e:
-        error_msg = f"Error exporting wiki: {str(e)}"
-        logger.error(error_msg)
+        error_msg = "Error exporting wiki"
+        logger.error(error_msg, e)
         raise HTTPException(status_code=500, detail=error_msg)
 
 @app.get("/local_repo/structure")
@@ -289,13 +289,13 @@ async def get_local_repo_structure(path: str = Query(None, description="Path to 
                         with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
                             readme_content = f.read()
                     except Exception as e:
-                        logger.warning(f"Could not read README.md: {str(e)}")
+                        logger.warning("Could not read README.md", e)
                         readme_content = ""
 
         file_tree_str = '\n'.join(sorted(file_tree_lines))
         return {"file_tree": file_tree_str, "readme": readme_content}
     except Exception as e:
-        logger.error(f"Error processing local repository: {str(e)}")
+        logger.error("Error processing local repository", e)
         return JSONResponse(
             status_code=500,
             content={"error": f"Error processing local repository: {str(e)}"}
@@ -399,7 +399,7 @@ async def read_wiki_cache(owner: str, repo: str, repo_type: str, language: str) 
                 data = json.load(f)
                 return WikiCacheData(**data)
         except Exception as e:
-            logger.error(f"Error reading wiki cache from {cache_path}: {e}")
+            logger.error(f"Error reading wiki cache from {cache_path}", e)
             return None
     return None
 
@@ -430,7 +430,7 @@ async def save_wiki_cache(data: WikiCacheRequest) -> bool:
         logger.error(f"IOError saving wiki cache to {cache_path}: {e.strerror} (errno: {e.errno})", exc_info=True)
         return False
     except Exception as e:
-        logger.error(f"Unexpected error saving wiki cache to {cache_path}: {e}", exc_info=True)
+        logger.error(f"Unexpected error saving wiki cache to {cache_path}", e, exc_info=True)
         return False
 
 # --- Wiki Cache API Endpoints ---
@@ -508,7 +508,7 @@ async def delete_wiki_cache(
             logger.info(f"Successfully deleted wiki cache: {cache_path}")
             return {"message": f"Wiki cache for {owner}/{repo} ({language}) deleted successfully"}
         except Exception as e:
-            logger.error(f"Error deleting wiki cache {cache_path}: {e}")
+            logger.error(f"Error deleting wiki cache {cache_path}", e)
             raise HTTPException(status_code=500, detail=f"Failed to delete wiki cache: {str(e)}")
     else:
         logger.warning(f"Wiki cache not found, cannot delete: {cache_path}")
@@ -598,7 +598,7 @@ async def get_processed_projects():
                     else:
                         logger.warning(f"Could not parse project details from filename: {filename}")
                 except Exception as e:
-                    logger.error(f"Error processing file {file_path}: {e}")
+                    logger.error(f"Error processing file {file_path}", e)
                     continue # Skip this file on error
 
         # Sort by most recent first
@@ -607,5 +607,5 @@ async def get_processed_projects():
         return project_entries
 
     except Exception as e:
-        logger.error(f"Error listing processed projects from {WIKI_CACHE_DIR}: {e}", exc_info=True)
+        logger.error(f"Error listing processed projects from {WIKI_CACHE_DIR}", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to list processed projects from server cache.")

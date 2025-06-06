@@ -51,7 +51,7 @@ def count_tokens(text: str, is_ollama_embedder: bool = None) -> int:
         return len(encoding.encode(text))
     except Exception as e:
         # Fallback to a simple approximation if tiktoken fails
-        logger.warning(f"Error counting tokens with tiktoken: {e}")
+        logger.warning(f"Error counting tokens with tiktoken", e)
         # Rough approximation: 4 characters per token
         return len(text) // 4
 
@@ -122,7 +122,7 @@ def download_repo(repo_url: str, local_path: str, type: str = "github", access_t
             error_msg = error_msg.replace(access_token, "***TOKEN***")
         raise ValueError(f"Error during cloning: {error_msg}")
     except Exception as e:
-        raise ValueError(f"An unexpected error occurred: {str(e)}")
+        raise ValueError(f"An unexpected error occurred") from e
 
 # Alias for backward compatibility
 download_github_repo = download_repo
@@ -311,7 +311,7 @@ def read_all_documents(path: str, is_ollama_embedder: bool = None, excluded_dirs
                     )
                     documents.append(doc)
             except Exception as e:
-                logger.error(f"Error reading {file_path}: {e}")
+                logger.error(f"Error reading {file_path}", e)
 
     # Then process documentation files
     for ext in doc_extensions:
@@ -345,7 +345,7 @@ def read_all_documents(path: str, is_ollama_embedder: bool = None, excluded_dirs
                     )
                     documents.append(doc)
             except Exception as e:
-                logger.error(f"Error reading {file_path}: {e}")
+                logger.error(f"Error reading {file_path}", e)
 
     logger.info(f"Found {len(documents)} documents")
     return documents
@@ -451,7 +451,7 @@ def get_github_file_content(repo_url: str, file_path: str, access_token: str = N
             response = requests.get(api_url, headers=headers)
             response.raise_for_status()
         except RequestException as e:
-            raise ValueError(f"Error fetching file content: {e}")
+            raise ValueError(f"Error fetching file content") from e
         try:
             content_data = response.json()
         except json.JSONDecodeError:
@@ -474,7 +474,7 @@ def get_github_file_content(repo_url: str, file_path: str, access_token: str = N
             raise ValueError("File content not found in GitHub API response")
 
     except Exception as e:
-        raise ValueError(f"Failed to get file content: {str(e)}")
+        raise ValueError("Failed to get file content") from e
 
 def get_gitlab_file_content(repo_url: str, file_path: str, access_token: str = None) -> str:
     """
@@ -525,7 +525,7 @@ def get_gitlab_file_content(repo_url: str, file_path: str, access_token: str = N
             response.raise_for_status()
             content = response.text
         except RequestException as e:
-            raise ValueError(f"Error fetching file content: {e}")
+            raise ValueError(f"Error fetching file content") from e
 
         # Check for GitLab error response (JSON instead of raw file)
         if content.startswith("{") and '"message":' in content:
@@ -539,7 +539,7 @@ def get_gitlab_file_content(repo_url: str, file_path: str, access_token: str = N
         return content
 
     except Exception as e:
-        raise ValueError(f"Failed to get file content: {str(e)}")
+        raise ValueError("Failed to get file content") from e
 
 def get_bitbucket_file_content(repo_url: str, file_path: str, access_token: str = None) -> str:
     """
@@ -591,10 +591,10 @@ def get_bitbucket_file_content(repo_url: str, file_path: str, access_token: str 
                 content = response.text
             return content
         except RequestException as e:
-            raise ValueError(f"Error fetching file content: {e}")
+            raise ValueError("Error fetching file content") from e
 
     except Exception as e:
-        raise ValueError(f"Failed to get file content: {str(e)}")
+        raise ValueError("Failed to get file content") from e
 
 
 def get_file_content(repo_url: str, file_path: str, type: str = "github", access_token: str = None) -> str:
@@ -721,7 +721,7 @@ class DatabaseManager:
             logger.info(f"Repo paths: {self.repo_paths}")
 
         except Exception as e:
-            logger.error(f"Failed to create repository structure: {e}")
+            logger.error("Failed to create repository structure", e)
             raise
 
     def prepare_db_index(self, is_ollama_embedder: bool = None, excluded_dirs: List[str] = None, excluded_files: List[str] = None,
@@ -750,7 +750,7 @@ class DatabaseManager:
                     logger.info(f"Loaded {len(documents)} documents from existing database")
                     return documents
             except Exception as e:
-                logger.error(f"Error loading existing database: {e}")
+                logger.error("Error loading existing database", e)
                 # Continue to create a new database
 
         # prepare the database

@@ -105,17 +105,17 @@ async def handle_websocket_chat(websocket: WebSocket):
             logger.info(f"Retriever prepared for {request.repo_url}")
         except ValueError as e:
             if "No valid documents with embeddings found" in str(e):
-                logger.error(f"No valid embeddings found: {str(e)}")
+                logger.error("No valid embeddings found", e)
                 await websocket.send_text("Error: No valid document embeddings found. This may be due to embedding size inconsistencies or API errors during document processing. Please try again or check your repository content.")
                 await websocket.close()
                 return
             else:
-                logger.error(f"ValueError preparing retriever: {str(e)}")
+                logger.error("ValueError preparing retriever", e)
                 await websocket.send_text(f"Error preparing retriever: {str(e)}")
                 await websocket.close()
                 return
         except Exception as e:
-            logger.error(f"Error preparing retriever: {str(e)}")
+            logger.error("Error preparing retriever", e)
             # Check for specific embedding-related errors
             if "All embeddings should be of the same size" in str(e):
                 await websocket.send_text("Error: Inconsistent embedding sizes detected. Some documents may have failed to embed properly. Please try again.")
@@ -230,11 +230,11 @@ async def handle_websocket_chat(websocket: WebSocket):
                     else:
                         logger.warning("No documents retrieved from RAG")
                 except Exception as e:
-                    logger.error(f"Error in RAG retrieval: {str(e)}")
+                    logger.error("Error in RAG retrieval", e)
                     # Continue without RAG if there's an error
 
             except Exception as e:
-                logger.error(f"Error retrieving documents: {str(e)}")
+                logger.error("Error retrieving documents", e)
                 context_text = ""
 
         # Get repository information
@@ -398,7 +398,7 @@ This file contains...
                 file_content = get_file_content(request.repo_url, request.filePath, request.type, request.token)
                 logger.info(f"Successfully retrieved content for file: {request.filePath}")
             except Exception as e:
-                logger.error(f"Error retrieving file content: {str(e)}")
+                logger.error("Error retrieving file content", e)
                 # Continue without file content if there's an error
 
         # Format conversation history
@@ -679,7 +679,7 @@ This file contains...
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
     except Exception as e:
-        logger.error(f"Error in WebSocket handler: {str(e)}")
+        logger.error("Error in WebSocket handler", e)
         try:
             await websocket.send_text(f"Error: {str(e)}")
             await websocket.close()
