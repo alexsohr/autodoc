@@ -1,7 +1,7 @@
 {
   "common": {
     "appName": "AutoDoc",
-    "tagline": "AI-powered documentation",
+    "tagline": "Intelligent Documentation Automation",
     "generateWiki": "Generate Wiki",
     "processing": "Processing...",
     "error": "Error",
@@ -19,7 +19,7 @@
   },
   "home": {
     "welcome": "Welcome to AutoDoc",
-    "welcomeTagline": "AI-powered documentation for your code repositories",
+    "welcomeTagline": "Intelligent Documentation Automation for your code repositories",
     "description": "Generate comprehensive documentation from GitHub, GitLab, or Bitbucket repositories with just a few clicks.",
     "quickStart": "Quick Start",
     "enterRepoUrl": "Enter a repository URL in one of these formats:",
@@ -93,7 +93,7 @@
     "authorizationRequired": "Authentication is required to generate the wiki."
   },
   "footer": {
-    "copyright": "AutoDoc - AI-powered documentation for code repositories"
+    "copyright": "AutoDoc - Intelligent Documentation Automation for code repositories"
   },
   "ask": {
     "placeholder": "Ask a question about this repository...",

@@ -67,7 +67,7 @@ class ChatCompletionRequest(BaseModel):
     provider: str = Field("google", description="Model provider (google, openai, openrouter, ollama, bedrock)")
     model: Optional[str] = Field(None, description="Model name for the specified provider")
 
-    language: Optional[str] = Field("en", description="Language for content generation (e.g., 'en', 'ja', 'zh', 'es', 'kr', 'vi')")
+    language: Optional[str] = Field("en", description="Language for content generation (e.g., 'en')")
     excluded_dirs: Optional[str] = Field(None, description="Comma-separated list of directories to exclude from processing")
     excluded_files: Optional[str] = Field(None, description="Comma-separated list of file patterns to exclude from processing")
     included_dirs: Optional[str] = Field(None, description="Comma-separated list of directories to include exclusively")
@@ -431,7 +431,7 @@ This file contains...
         prompt += f"<query>\n{query}\n</query>\n\nAssistant: "
 
         model_config = get_model_config(request.provider, request.model)["model_kwargs"]
-
+        
         if request.provider == "ollama":
             prompt += " /no_think"
 

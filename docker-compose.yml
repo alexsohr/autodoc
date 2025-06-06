@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  deepwiki:
+  autodoc:
     build:
       context: .
       dockerfile: Dockerfile

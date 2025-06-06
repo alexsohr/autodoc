@@ -55,12 +55,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         console.error("Failed to fetch auth status:", err);
         // Assuming auth is required if fetch fails to avoid blocking UI for safety
         const defaultSupportedLanguages = {
-          "en": "English",
-          "ja": "Japanese (日本語)",
-          "zh": "Mandarin Chinese (中文)",
-          "es": "Spanish (Español)",
-          "kr": "Korean (한국어)",
-          "vi": "Vietnamese (Tiếng Việt)"
+          "en": "English"
         };
         setSupportedLanguages(defaultSupportedLanguages);
         setDefaultLanguage("en");

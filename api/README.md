@@ -1,6 +1,6 @@
-# 🚀 DeepWiki API
+# 🚀 AutoDoc API
 
-This is the backend API for DeepWiki, providing smart code analysis and AI-powered documentation generation.
+This is the backend API for AutoDoc, providing smart code analysis and AI-powered documentation generation.
 
 ## ✨ Features
 
@@ -58,7 +58,7 @@ If you're not using Ollama mode, you need to configure an OpenAI API key for emb
 #### Advanced Environment Configuration
 
 ##### Provider-Based Model Selection
-DeepWiki supports multiple LLM providers. The environment variables above are required depending on which providers you want to use:
+AUTODOC supports multiple LLM providers. The environment variables above are required depending on which providers you want to use:
 
 - **Google Gemini**: Requires `GOOGLE_API_KEY`
 - **OpenAI**: Requires `OPENAI_API_KEY`
@@ -79,7 +79,7 @@ OPENAI_BASE_URL=https://custom-openai-endpoint.com/v1
 ```
 
 ##### Configuration Files
-DeepWiki now uses JSON configuration files to manage various system components instead of hardcoded values:
+AUTODOC now uses JSON configuration files to manage various system components instead of hardcoded values:
 
 1. **`generator.json`**: Configuration for text generation models
    - Located in `api/config/` by default
@@ -101,7 +101,7 @@ DeepWiki now uses JSON configuration files to manage various system components i
 You can customize the configuration directory location using the environment variable:
 
 ```
-DEEPWIKI_CONFIG_DIR=/path/to/custom/config/dir  # Optional, for custom config file location
+AUTODOC_CONFIG_DIR=/path/to/custom/config/dir  # Optional, for custom config file location
 ```
 
 This allows you to maintain different configurations for various environments or deployment scenarios without modifying the code.
