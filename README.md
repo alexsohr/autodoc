@@ -2,7 +2,7 @@
 
 ![AutoDoc Banner](screenshots/autodoc.png)
 
-**AutoDoc** is my own implementation attempt of AutoDoc, automatically creates beautiful, interactive wikis for any GitHub, GitLab, or BitBucket repository! Just enter a repo name, and AutoDoc will:
+**AutoDoc** is my own implementation attempt of Deepwiki-open, automatically creates beautiful, interactive wikis for any GitHub, GitLab, or BitBucket repository! Just enter a repo name, and AutoDoc will:
 
 1. Analyze the code structure
 2. Generate comprehensive documentation
