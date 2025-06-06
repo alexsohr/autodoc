@@ -295,12 +295,7 @@ IMPORTANT CONTENT GUIDELINES:
 8. Include diagrams to visualize complex concepts
 9. Make sure the workshop is engaging and interactive
 
-Make the workshop content in ${language === 'en' ? 'English' :
-  language === 'ja' ? 'Japanese (日本語)' :
-  language === 'zh' ? 'Mandarin Chinese (中文)' :
-  language === 'es' ? 'Spanish (Español)' :
-  language === 'kr' ? 'Korean (한국어)' :
-  language === 'vi' ? 'Vietnamese (Tiếng Việt)' : 'English'} language.`
+Make the workshop content in 'English' language.`
         }]
       };
 

@@ -39,7 +39,7 @@ The first command downloads the embedding model that DeepWiki uses to understand
 
 Clone the DeepWiki repository:
 ```bash
-git clone https://github.com/AsyncFuncAI/deepwiki-open.git
+git clone https://github.com/alexsohr/deepwiki-open.git
 cd deepwiki-open
 ```
 

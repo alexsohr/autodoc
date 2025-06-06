@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Deepwiki-Open",
+            "name": "AutoDoc",
             "type": "python",
             "request": "launch",
             "module": "uvicorn",
