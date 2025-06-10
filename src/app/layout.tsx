@@ -25,8 +25,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Deepwiki Open Source | Sheing Ng",
-  description: "Created by Sheing Ng",
+  title: "AutoDoc",
+  description: "AutoDoc is a tool that automatically creates beautiful, interactive wikis for any GitHub, GitLab, or BitBucket repository! Just enter a repo name, and AutoDoc will: 1. Generate a detailed plan for the wiki 2. Create a beautiful, interactive wiki 3. Allow you to edit the wiki in real-time",
 };
 
 export default function RootLayout({

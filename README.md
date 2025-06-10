@@ -467,10 +467,6 @@ To use DeepResearch, simply toggle the "Deep Research" switch in the Ask interfa
 ![DeepResearch Feature](screenshots/DeepResearch.png)
 *DeepResearch conducts multi-turn investigations for complex topics*
 
-### Demo Video
-
-[![DeepWiki Demo Video](https://img.youtube.com/vi/zGANs8US8B4/0.jpg)](https://youtu.be/zGANs8US8B4)
-
 *Watch DeepWiki in action!*
 
 ## ❓ Troubleshooting
