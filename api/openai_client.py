@@ -17,6 +17,7 @@ from typing import (
 import re
 
 import logging
+from venv import logger
 import backoff
 
 # optional import
@@ -188,7 +189,21 @@ class OpenAIClient(ModelClient):
         self._api_kwargs = {}  # add api kwargs when the OpenAI Client is called
 
     def init_sync_client(self):
-        api_key = self._api_key or os.getenv(self._env_api_key_name)
+        # Always prioritize environment variable over cached _api_key
+        env_api_key = os.getenv(self._env_api_key_name)
+        logger.debug(f"_env_api_key_name: {self._env_api_key_name}")
+        logger.debug(f"env_api_key: {env_api_key}")
+        api_key = env_api_key or self._api_key
+        
+        # Debug logging
+        log.debug(f"=== OPENAI CLIENT INIT DEBUG ===")
+        log.debug(f"Environment variable {self._env_api_key_name} found: {bool(env_api_key)}")
+        if env_api_key:
+            log.debug(f"Environment API key starts with sk-: {env_api_key.startswith('sk-')}")
+            log.debug(f"Environment API key length: {len(env_api_key)}")
+        log.debug(f"Cached _api_key: {self._api_key[:20] if self._api_key else None}...")
+        log.debug(f"Using environment variable: {bool(env_api_key)}")
+        
         if not api_key:
             raise ValueError(
                 f"Environment variable {self._env_api_key_name} must be set"
@@ -196,7 +211,8 @@ class OpenAIClient(ModelClient):
         return OpenAI(api_key=api_key, base_url=self.base_url)
 
     def init_async_client(self):
-        api_key = self._api_key or os.getenv(self._env_api_key_name)
+        # Always prioritize environment variable over cached _api_key
+        api_key = os.getenv(self._env_api_key_name) or self._api_key
         if not api_key:
             raise ValueError(
                 f"Environment variable {self._env_api_key_name} must be set"
@@ -224,7 +240,7 @@ class OpenAIClient(ModelClient):
         try:
             data = self.chat_completion_parser(completion)
         except Exception as e:
-            log.error(f"Error parsing the completion: {e}")
+            log.error("Error parsing the completion", e)
             return GeneratorOutput(data=None, error=str(e), raw_response=completion)
 
         try:
@@ -233,7 +249,7 @@ class OpenAIClient(ModelClient):
                 data=None, error=None, raw_response=data, usage=usage
             )
         except Exception as e:
-            log.error(f"Error tracking the completion usage: {e}")
+            log.error("Error tracking the completion usage", e)
             return GeneratorOutput(data=None, error=str(e), raw_response=data)
 
     def track_completion_usage(
@@ -249,7 +265,7 @@ class OpenAIClient(ModelClient):
             )
             return usage
         except Exception as e:
-            log.error(f"Error tracking the completion usage: {e}")
+            log.error("Error tracking the completion usage", e)
             return CompletionUsage(
                 completion_tokens=None, prompt_tokens=None, total_tokens=None
             )
@@ -264,7 +280,7 @@ class OpenAIClient(ModelClient):
         try:
             return parse_embedding_response(response)
         except Exception as e:
-            log.error(f"Error parsing the embedding response: {e}")
+            log.error("Error parsing the embedding response", e)
             return EmbedderOutput(data=[], error=str(e), raw_response=response)
 
     def convert_inputs_to_api_kwargs(
@@ -394,7 +410,7 @@ class OpenAIClient(ModelClient):
                 raw_response=str(response),
             )
         except Exception as e:
-            log.error(f"Error parsing image generation response: {e}")
+            log.error("Error parsing image generation response", e)
             return GeneratorOutput(data=None, error=str(e), raw_response=str(response))
 
     @backoff.on_exception(
@@ -555,7 +571,7 @@ class OpenAIClient(ModelClient):
         except PermissionError:
             raise ValueError(f"Permission denied when reading image file: {image_path}")
         except Exception as e:
-            raise ValueError(f"Error encoding image {image_path}: {str(e)}")
+            raise ValueError(f"Error encoding image {image_path}") from e
 
     def _prepare_image_content(
         self, image_source: Union[str, Dict[str, Any]], detail: str = "auto"

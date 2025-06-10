@@ -190,7 +190,7 @@ async def get_model_config():
         return config
 
     except Exception as e:
-        logger.error(f"Error creating model configuration: {str(e)}")
+        logger.error(f"Error creating model configuration", e)
         # Return some default configuration in case of error
         return ModelConfig(
             providers=[
@@ -250,8 +250,8 @@ async def export_wiki(request: WikiExportRequest):
         return response
 
     except Exception as e:
-        error_msg = f"Error exporting wiki: {str(e)}"
-        logger.error(error_msg)
+        error_msg = "Error exporting wiki"
+        logger.error(error_msg, e)
         raise HTTPException(status_code=500, detail=error_msg)
 
 @app.get("/local_repo/structure")
@@ -289,13 +289,13 @@ async def get_local_repo_structure(path: str = Query(None, description="Path to 
                         with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
                             readme_content = f.read()
                     except Exception as e:
-                        logger.warning(f"Could not read README.md: {str(e)}")
+                        logger.warning("Could not read README.md", e)
                         readme_content = ""
 
         file_tree_str = '\n'.join(sorted(file_tree_lines))
         return {"file_tree": file_tree_str, "readme": readme_content}
     except Exception as e:
-        logger.error(f"Error processing local repository: {str(e)}")
+        logger.error("Error processing local repository", e)
         return JSONResponse(
             status_code=500,
             content={"error": f"Error processing local repository: {str(e)}"}
@@ -326,8 +326,6 @@ def generate_markdown_export(repo_url: str, pages: List[WikiPage]) -> str:
     for page in pages:
         markdown += f"<a id='{page.id}'></a>\n\n"
         markdown += f"## {page.title}\n\n"
-
-
 
         # Add related pages
         if page.relatedPages and len(page.relatedPages) > 0:
@@ -389,7 +387,7 @@ os.makedirs(WIKI_CACHE_DIR, exist_ok=True)
 
 def get_wiki_cache_path(owner: str, repo: str, repo_type: str, language: str) -> str:
     """Generates the file path for a given wiki cache."""
-    filename = f"deepwiki_cache_{repo_type}_{owner}_{repo}_{language}.json"
+    filename = f"autodoc_cache_{repo_type}_{owner}_{repo}_{language}.json"
     return os.path.join(WIKI_CACHE_DIR, filename)
 
 async def read_wiki_cache(owner: str, repo: str, repo_type: str, language: str) -> Optional[WikiCacheData]:
@@ -401,7 +399,7 @@ async def read_wiki_cache(owner: str, repo: str, repo_type: str, language: str) 
                 data = json.load(f)
                 return WikiCacheData(**data)
         except Exception as e:
-            logger.error(f"Error reading wiki cache from {cache_path}: {e}")
+            logger.error(f"Error reading wiki cache from {cache_path}", e)
             return None
     return None
 
@@ -423,7 +421,6 @@ async def save_wiki_cache(data: WikiCacheRequest) -> bool:
         except Exception as ser_e:
             logger.warning(f"Could not serialize payload for size logging: {ser_e}")
 
-
         logger.info(f"Writing cache file to: {cache_path}")
         with open(cache_path, 'w', encoding='utf-8') as f:
             json.dump(payload.model_dump(), f, indent=2)
@@ -433,7 +430,7 @@ async def save_wiki_cache(data: WikiCacheRequest) -> bool:
         logger.error(f"IOError saving wiki cache to {cache_path}: {e.strerror} (errno: {e.errno})", exc_info=True)
         return False
     except Exception as e:
-        logger.error(f"Unexpected error saving wiki cache to {cache_path}: {e}", exc_info=True)
+        logger.error(f"Unexpected error saving wiki cache to {cache_path}", e, exc_info=True)
         return False
 
 # --- Wiki Cache API Endpoints ---
@@ -511,7 +508,7 @@ async def delete_wiki_cache(
             logger.info(f"Successfully deleted wiki cache: {cache_path}")
             return {"message": f"Wiki cache for {owner}/{repo} ({language}) deleted successfully"}
         except Exception as e:
-            logger.error(f"Error deleting wiki cache {cache_path}: {e}")
+            logger.error(f"Error deleting wiki cache {cache_path}", e)
             raise HTTPException(status_code=500, detail=f"Failed to delete wiki cache: {str(e)}")
     else:
         logger.warning(f"Wiki cache not found, cannot delete: {cache_path}")
@@ -523,7 +520,7 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "service": "deepwiki-api"
+        "service": "autodoc-api"
     }
 
 @app.get("/")
@@ -558,7 +555,7 @@ async def root():
 async def get_processed_projects():
     """
     Lists all processed projects found in the wiki cache directory.
-    Projects are identified by files named like: deepwiki_cache_{repo_type}_{owner}_{repo}_{language}.json
+    Projects are identified by files named like: autodoc_cache_{repo_type}_{owner}_{repo}_{language}.json
     """
     project_entries: List[ProcessedProjectEntry] = []
     # WIKI_CACHE_DIR is already defined globally in the file
@@ -572,15 +569,15 @@ async def get_processed_projects():
         filenames = await asyncio.to_thread(os.listdir, WIKI_CACHE_DIR) # Use asyncio.to_thread for os.listdir
 
         for filename in filenames:
-            if filename.startswith("deepwiki_cache_") and filename.endswith(".json"):
+            if filename.startswith("autodoc_cache_") and filename.endswith(".json"):
                 file_path = os.path.join(WIKI_CACHE_DIR, filename)
                 try:
                     stats = await asyncio.to_thread(os.stat, file_path) # Use asyncio.to_thread for os.stat
-                    parts = filename.replace("deepwiki_cache_", "").replace(".json", "").split('_')
+                    parts = filename.replace("autodoc_cache_", "").replace(".json", "").split('_')
 
                     # Expecting repo_type_owner_repo_language
-                    # Example: deepwiki_cache_github_AsyncFuncAI_deepwiki-open_en.json
-                    # parts = [github, AsyncFuncAI, deepwiki-open, en]
+                    # Example: autodoc_cache_github_alexsohr_autodoc_en.json
+                    # parts = [github, alexsohr, autodoc, en]
                     if len(parts) >= 4:
                         repo_type = parts[0]
                         owner = parts[1]
@@ -601,7 +598,7 @@ async def get_processed_projects():
                     else:
                         logger.warning(f"Could not parse project details from filename: {filename}")
                 except Exception as e:
-                    logger.error(f"Error processing file {file_path}: {e}")
+                    logger.error(f"Error processing file {file_path}", e)
                     continue # Skip this file on error
 
         # Sort by most recent first
@@ -610,5 +607,5 @@ async def get_processed_projects():
         return project_entries
 
     except Exception as e:
-        logger.error(f"Error listing processed projects from {WIKI_CACHE_DIR}: {e}", exc_info=True)
+        logger.error(f"Error listing processed projects from {WIKI_CACHE_DIR}", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to list processed projects from server cache.")

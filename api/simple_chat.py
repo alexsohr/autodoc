@@ -67,7 +67,7 @@ class ChatCompletionRequest(BaseModel):
     provider: str = Field("google", description="Model provider (google, openai, openrouter, ollama, bedrock)")
     model: Optional[str] = Field(None, description="Model name for the specified provider")
 
-    language: Optional[str] = Field("en", description="Language for content generation (e.g., 'en', 'ja', 'zh', 'es', 'kr', 'vi')")
+    language: Optional[str] = Field("en", description="Language for content generation (e.g., 'en')")
     excluded_dirs: Optional[str] = Field(None, description="Comma-separated list of directories to exclude from processing")
     excluded_files: Optional[str] = Field(None, description="Comma-separated list of file patterns to exclude from processing")
     included_dirs: Optional[str] = Field(None, description="Comma-separated list of directories to include exclusively")
@@ -111,17 +111,25 @@ async def chat_completions_stream(request: ChatCompletionRequest):
                 included_files = [unquote(file_pattern) for file_pattern in request.included_files.split('\n') if file_pattern.strip()]
                 logger.info(f"Using custom included files: {included_files}")
 
-            request_rag.prepare_retriever(request.repo_url, request.type, request.token, excluded_dirs, excluded_files, included_dirs, included_files)
+            request_rag.prepare_retriever(
+                request.repo_url, 
+                request.type or "github", 
+                request.token or "", 
+                excluded_dirs or [], 
+                excluded_files or [], 
+                included_dirs or [], 
+                included_files or []
+            )
             logger.info(f"Retriever prepared for {request.repo_url}")
         except ValueError as e:
             if "No valid documents with embeddings found" in str(e):
-                logger.error(f"No valid embeddings found: {str(e)}")
+                logger.error("No valid embeddings found: %s", str(e))
                 raise HTTPException(status_code=500, detail="No valid document embeddings found. This may be due to embedding size inconsistencies or API errors during document processing. Please try again or check your repository content.")
             else:
-                logger.error(f"ValueError preparing retriever: {str(e)}")
+                logger.error("ValueError preparing retriever: %s", str(e))
                 raise HTTPException(status_code=500, detail=f"Error preparing retriever: {str(e)}")
         except Exception as e:
-            logger.error(f"Error preparing retriever: {str(e)}")
+            logger.error("Error preparing retriever: %s", str(e))
             # Check for specific embedding-related errors
             if "All embeddings should be of the same size" in str(e):
                 raise HTTPException(status_code=500, detail="Inconsistent embedding sizes detected. Some documents may have failed to embed properly. Please try again.")
@@ -230,11 +238,11 @@ async def chat_completions_stream(request: ChatCompletionRequest):
                     else:
                         logger.warning("No documents retrieved from RAG")
                 except Exception as e:
-                    logger.error(f"Error in RAG retrieval: {str(e)}")
+                    logger.error("Error in RAG retrieval: %s", str(e))
                     # Continue without RAG if there's an error
 
             except Exception as e:
-                logger.error(f"Error retrieving documents: {str(e)}")
+                logger.error("Error retrieving documents: %s", str(e))
                 context_text = ""
 
         # Get repository information
@@ -395,10 +403,10 @@ This file contains...
         file_content = ""
         if request.filePath:
             try:
-                file_content = get_file_content(request.repo_url, request.filePath, request.type, request.token)
+                file_content = get_file_content(request.repo_url, request.filePath, request.type or "github", request.token or "")
                 logger.info(f"Successfully retrieved content for file: {request.filePath}")
             except Exception as e:
-                logger.error(f"Error retrieving file content: {str(e)}")
+                logger.error("Error retrieving file content: %s", str(e))
                 # Continue without file content if there's an error
 
         # Format conversation history
@@ -431,7 +439,12 @@ This file contains...
         prompt += f"<query>\n{query}\n</query>\n\nAssistant: "
 
         model_config = get_model_config(request.provider, request.model)["model_kwargs"]
-
+        
+        # Initialize the appropriate model and api_kwargs based on provider
+        model = None
+        api_kwargs = None
+        google_model = None
+        
         if request.provider == "ollama":
             prompt += " /no_think"
 
@@ -517,7 +530,7 @@ This file contains...
             )
         else:
             # Initialize Google Generative AI model
-            model = genai.GenerativeModel(
+            google_model = genai.GenerativeModel(
                 model_name=model_config["model"],
                 generation_config={
                     "temperature": model_config["temperature"],
@@ -529,7 +542,7 @@ This file contains...
         # Create a streaming response
         async def response_stream():
             try:
-                if request.provider == "ollama":
+                if request.provider == "ollama" and model is not None and api_kwargs is not None:
                     # Get the response and handle it properly using the previously created api_kwargs
                     response = await model.acall(api_kwargs=api_kwargs, model_type=ModelType.LLM)
                     # Handle streaming response from Ollama
@@ -538,7 +551,7 @@ This file contains...
                         if text and not text.startswith('model=') and not text.startswith('created_at='):
                             text = text.replace('<think>', '').replace('</think>', '')
                             yield text
-                elif request.provider == "openrouter":
+                elif request.provider == "openrouter" and model is not None and api_kwargs is not None:
                     try:
                         # Get the response and handle it properly using the previously created api_kwargs
                         logger.info("Making OpenRouter API call")
@@ -549,7 +562,7 @@ This file contains...
                     except Exception as e_openrouter:
                         logger.error(f"Error with OpenRouter API: {str(e_openrouter)}")
                         yield f"\nError with OpenRouter API: {str(e_openrouter)}\n\nPlease check that you have set the OPENROUTER_API_KEY environment variable with a valid API key."
-                elif request.provider == "openai":
+                elif request.provider == "openai" and model is not None and api_kwargs is not None:
                     try:
                         # Get the response and handle it properly using the previously created api_kwargs
                         logger.info("Making Openai API call")
@@ -566,7 +579,7 @@ This file contains...
                     except Exception as e_openai:
                         logger.error(f"Error with Openai API: {str(e_openai)}")
                         yield f"\nError with Openai API: {str(e_openai)}\n\nPlease check that you have set the OPENAI_API_KEY environment variable with a valid API key."
-                elif request.provider == "bedrock":
+                elif request.provider == "bedrock" and model is not None and api_kwargs is not None:
                     try:
                         # Get the response and handle it properly using the previously created api_kwargs
                         logger.info("Making AWS Bedrock API call")
@@ -580,13 +593,15 @@ This file contains...
                     except Exception as e_bedrock:
                         logger.error(f"Error with AWS Bedrock API: {str(e_bedrock)}")
                         yield f"\nError with AWS Bedrock API: {str(e_bedrock)}\n\nPlease check that you have set the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables with valid credentials."
-                else:
-                    # Generate streaming response
-                    response = model.generate_content(prompt, stream=True)
+                elif google_model is not None:
+                    # Generate streaming response using Google Generative AI
+                    response = google_model.generate_content(prompt, stream=True)
                     # Stream the response
                     for chunk in response:
                         if hasattr(chunk, 'text'):
                             yield chunk.text
+                else:
+                    yield "Error: Unable to initialize model for the specified provider."
 
             except Exception as e_outer:
                 logger.error(f"Error in streaming response: {str(e_outer)}")

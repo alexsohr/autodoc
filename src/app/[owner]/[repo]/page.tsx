@@ -89,7 +89,7 @@ const wikiStyles = `
 
 // Helper function to generate cache key for localStorage
 const getCacheKey = (owner: string, repo: string, repoType: string, language: string, isComprehensive: boolean = true): string => {
-  return `deepwiki_cache_${repoType}_${owner}_${repo}_${language}_${isComprehensive ? 'comprehensive' : 'concise'}`;
+  return `autodoc_cache_${repoType}_${owner}_${repo}_${language}_${isComprehensive ? 'comprehensive' : 'concise'}`;
 };
 
 // Helper function to add tokens and other parameters to request body
@@ -405,12 +405,7 @@ Based ONLY on the content of the \`[RELEVANT_SOURCE_FILES]\`:
 
 9.  **Conclusion/Summary:** End with a brief summary paragraph if appropriate for "${page.title}", reiterating the key aspects covered and their significance within the project.
 
-IMPORTANT: Generate the content in ${language === 'en' ? 'English' :
-            language === 'ja' ? 'Japanese (日本語)' :
-            language === 'zh' ? 'Mandarin Chinese (中文)' :
-            language === 'es' ? 'Spanish (Español)' :
-            language === 'kr' ? 'Korean (한국어)' :
-            language === 'vi' ? 'Vietnamese (Tiếng Việt)' : 'English'} language.
+IMPORTANT: Generate the content in 'English' language.
 
 Remember:
 - Ground every claim in the provided source files.
@@ -615,12 +610,7 @@ ${readme}
 
 I want to create a wiki for this repository. Determine the most logical structure for a wiki based on the repository's content.
 
-IMPORTANT: The wiki content will be generated in ${language === 'en' ? 'English' :
-            language === 'ja' ? 'Japanese (日本語)' :
-            language === 'zh' ? 'Mandarin Chinese (中文)' :
-            language === 'es' ? 'Spanish (Español)' :
-            language === 'kr' ? 'Korean (한国語)' :
-            language === 'vi' ? 'Vietnamese (Tiếng Việt)' : 'English'} language.
+IMPORTANT: The wiki content will be generated in 'English' language.
 
 When designing the wiki structure, include pages that would benefit from visual diagrams, such as:
 - Architecture overviews
@@ -1999,7 +1989,7 @@ IMPORTANT:
       <footer className="max-w-[90%] xl:max-w-[1400px] mx-auto mt-8 flex flex-col gap-4 w-full">
         <div className="flex justify-between items-center gap-4 text-center text-[var(--muted)] text-sm h-fit w-full bg-[var(--card-bg)] rounded-lg p-3 shadow-sm border border-[var(--border-color)]">
           <p className="flex-1 font-serif">
-            {messages.footer?.copyright || 'DeepWiki - Generate Wiki from GitHub/Gitlab/Bitbucket repositories'}
+            {messages.footer?.copyright || 'AutoDoc - Generate Wiki from GitHub/Gitlab/Bitbucket repositories'}
           </p>
           <ThemeToggle />
         </div>
