@@ -166,7 +166,7 @@ Add this configuration to your Claude Desktop MCP settings file:
         "--with", "fastmcp>=2.8.0",
         "--with", "httpx>=0.28.0",
         "python",
-        "/path/to/your/autodoc/mcp/mcp-server.py"
+        "<PATH_TO_YOUR_AUTODOC_MCP>/mcp-server.py"
       ],
       "env": {
         "AUTODOC_SERVER_URL": "http://localhost:3000",
