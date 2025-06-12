@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractUrlDomain, extractUrlPath } from '@/utils/urlDecoder';
 
-const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_HOST || 'http://localhost:8001';
-const CACHE_API_ENDPOINT = `${PYTHON_BACKEND_URL}/api/wiki_cache`;
+const TARGET_SERVER_BASE_URL = process.env.SERVER_BASE_URL || 'http://localhost:8001';
+const CACHE_API_ENDPOINT = `${TARGET_SERVER_BASE_URL}/api/wiki_cache`;
 
 function parseRepoUrl(repoUrl: string): { owner: string; repo: string; repo_type: string } | null {
   repoUrl = repoUrl.trim();
@@ -49,8 +49,25 @@ export async function GET(req: NextRequest) {
     return new NextResponse(body, { status: response.status, statusText: response.statusText });
   }
   const data = await response.json();
-  if (!data || !data.generated_pages || !data.generated_pages[topic]) {
+  if (!data || !data.generated_pages) {
     return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
   }
-  return NextResponse.json(data.generated_pages[topic]);
+
+  // First try to find by exact page ID
+  if (data.generated_pages[topic]) {
+    return NextResponse.json(data.generated_pages[topic]);
+  }
+
+  // If not found by ID, try to find by page title
+  const pageByTitle = Object.values(data.generated_pages).find((page: unknown) => {
+    const typedPage = page as { title?: string };
+    return typedPage.title && typedPage.title.toLowerCase() === topic.toLowerCase();
+  });
+
+  if (pageByTitle) {
+    return NextResponse.json(pageByTitle);
+  }
+
+  // If still not found, return 404
+  return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
 }

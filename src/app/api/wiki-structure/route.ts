@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractUrlDomain, extractUrlPath } from '@/utils/urlDecoder';
 
-const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_HOST || 'http://localhost:8001';
-const CACHE_API_ENDPOINT = `${PYTHON_BACKEND_URL}/api/wiki_cache`;
+const TARGET_SERVER_BASE_URL = process.env.SERVER_BASE_URL || 'http://localhost:8001';
+const CACHE_API_ENDPOINT = `${TARGET_SERVER_BASE_URL}/api/wiki_cache`;
 
 function parseRepoUrl(repoUrl: string): { owner: string; repo: string; repo_type: string } | null {
   repoUrl = repoUrl.trim();
