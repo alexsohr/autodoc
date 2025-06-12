@@ -2,70 +2,41 @@ import os
 import json
 import hmac
 import re
-import hashlib
 import logging
 import aiohttp
 import requests
 import xml.etree.ElementTree as ET
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, List, Tuple
 from fastapi import HTTPException, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from api.web_hook.github_models import GithubPushEvent
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 # Import the FastAPI app instance
-from api.api import app
 from api.web_hook.github_prompts import generate_wiki_structure_prompt
 from api.websocket_wiki import handle_websocket_chat
 from dotenv import load_dotenv
 
 load_dotenv()
 
+app = FastAPI(
+    title="Streaming API",
+    description="API for streaming chat completions"
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+
 # Configure logger
 logger = logging.getLogger(__name__)
- 
-
-class Ref(BaseModel):
-    """
-    Model representing a Bitbucket reference (branch or tag).
-    Parameters:
-        id (str): The full reference ID (e.g., 'refs/heads/master')
-        displayId (str): The display name of the reference (e.g., 'master')
-        type (str): The type of reference (e.g., 'BRANCH')
-    Returns:
-        This class does not return anything
-    """
-    id: str
-    display_id: str = Field(..., alias="displayId")
-    type: str
- 
-
-class Change(BaseModel):
-    """
-    Model representing a single change in a Bitbucket push event.
-    Parameters:
-        ref (Ref): The reference object for the change
-        refId (str): The reference ID
-        fromHash (str): The commit hash before the change
-        toHash (str): The commit hash after the change
-        type (str): The type of change (e.g., 'UPDATE')
-    Returns:
-        This class does not return anything
-    """
-    ref: Ref
-    ref_id: str = Field(..., alias="refId")
-    from_hash: str = Field(..., alias="fromHash")
-    to_hash: str = Field(..., alias="toHash")
-    type: str
- 
-
-class BitbucketPushEvent(BaseModel):
-    """
-    Model for Bitbucket push event webhook payload.
-    """
-    changes: List[Change]
-    event_key: Optional[str] = Field(None, alias="eventKey")
-    class Config:
-        extra = "ignore"
- 
 
 async def generate_wiki_structure(owner: str, repo: str, file_tree: str, readme: str) -> str:
     """
@@ -147,32 +118,32 @@ async def generate_page_content(page: dict, owner: str, repo: str) -> str:
     return f"# {page['title']}\n\nThis is the auto-generated content for {page['title']} in {owner}/{repo}.\n\nSources: {', '.join(page['file_paths'])}"
  
 
-async def process_bitbucket_repository_async(repository: BitbucketPushEvent, actor_name: str = None):
+async def process_github_repository_async(github_event: GithubPushEvent, actor_name: str = None):
     """
-    Process a Bitbucket repository asynchronously to generate wiki documentation and content.
+    Process a Github repository asynchronously to generate wiki documentation and content.
     Parameters:
-        repository (BitbucketRepository): Bitbucket repository information
+        github_event (GithubpushEvent): Github push event information
         actor_name (str, optional): Name of the user who triggered the webhook
     Returns:
         dict: Result containing wiki structure and generated pages
     """
     try:
-        repo_url = f"https://bitbucket.org/{repository.full_name}"
-        repo_parts = repository.full_name.split('/')
+        repo_url = f"https://github.org/{github_event.repository.full_name}"
+        repo_parts = github_event.repository.full_name.split('/')
         if len(repo_parts) != 2:
-            logger.error(f"Invalid repository full_name format: {repository.full_name}")
+            logger.error(f"Invalid repository full_name format: {github_event.repository.full_name}")
             return
         owner, repo = repo_parts
-        logger.info(f"Starting async wiki generation for Bitbucket repository: {owner}/{repo}")
+        logger.info(f"Starting async wiki generation for Github repository: {owner}/{repo}")
         # Fetch file tree and README - fetchRepositoryUrl
         file_tree = await get_repo_file_tree(owner, repo)
         readme_content = await get_repo_readme(owner, repo)
         logger.info(f"Fetched file tree and README for {owner}/{repo}")
         # Use the generate_github_wiki_structure_prompt function to generate the request body
-        repo_url = f"https://bitbucket.org/{owner}/{repo}"
+        repo_url = f"https://github.org/{owner}/{repo}"
         # Prepare request body for wiki structure generation
         request_body = {
-            "repo_url": repo_url,
+            "repo_url": repo_url, 
             "type": "bitbucket",
             "messages": [{
                 "role": "user",
@@ -200,6 +171,7 @@ async def process_bitbucket_repository_async(repository: BitbucketPushEvent, act
         title = title_el.text if title_el is not None else ''
         description = description_el.text if description_el is not None else ''
         pages = []
+        # TODO: Add retyr ability
         for page_el in pages_els:
             id_ = page_el.get('id', f'page-{len(pages) + 1}')
             title_el = page_el.find('title')
@@ -284,13 +256,13 @@ async def process_bitbucket_repository_async(repository: BitbucketPushEvent, act
         logger.info(f"Wiki generation complete for {owner}/{repo}")
         return result
     except Exception as e:
-        logger.error(f"Error processing Bitbucket repository {repository.full_name}: {str(e)}", exc_info=True)
+        logger.error(f"Error processing Github repository {github_event.repository.full_name}: {str(e)}", exc_info=True)
         return {'error': str(e)}
  
 
 async def get_repo_file_tree(owner: str, repo: str) -> str:
     """
-    Get the file tree of a Bitbucket repository.
+    Get the file tree of a Github repository.
     Args:
         owner (str): Repository owner
         repo (str): Repository name
@@ -298,10 +270,10 @@ async def get_repo_file_tree(owner: str, repo: str) -> str:
         str: File tree as a string with one file per line
     """
     try:
-        # Get Bitbucket API token from environment
-        token = os.environ.get("BITBUCKET_API_TOKEN", "")
+        # Get Github API token from environment
+        token = os.environ.get("GITHUB_API_TOKEN", "")
         # Build API URL
-        api_url = f"https://api.bitbucket.org/2.0/repositories/{owner}/{repo}/src"
+        api_url = f"https://api.github.org/2.0/repositories/{owner}/{repo}/src"
         headers = {}
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -326,7 +298,7 @@ async def get_repo_file_tree(owner: str, repo: str) -> str:
 
 async def get_repo_readme(owner: str, repo: str) -> str:
     """
-    Get the README content of a Bitbucket repository.
+    Get the README content of a Github repository.
     Args:
         owner (str): Repository owner
         repo (str): Repository name
@@ -334,8 +306,8 @@ async def get_repo_readme(owner: str, repo: str) -> str:
         str: README content as a string
     """
     try:
-        # Get Bitbucket API token from environment
-        token = os.environ.get("BITBUCKET_API_TOKEN", "")
+        # Get Github API token from environment
+        token = os.environ.get("GITHUB_API_TOKEN", "")
         # Build API URL - try common README filenames
         readme_files = ["README.md", "README.rst", "README.txt", "README"]
         headers = {}
@@ -343,7 +315,7 @@ async def get_repo_readme(owner: str, repo: str) -> str:
             headers["Authorization"] = f"Bearer {token}"
         async with aiohttp.ClientSession() as session:
             for readme_file in readme_files:
-                api_url = f"https://api.bitbucket.org/2.0/repositories/{owner}/{repo}/src/master/{readme_file}"
+                api_url = f"https://api.github.org/2.0/repositories/{owner}/{repo}/src/master/{readme_file}"
                 async with session.get(api_url, headers=headers) as response:
                     if response.status == 200:
                         return await response.text()
@@ -355,20 +327,20 @@ async def get_repo_readme(owner: str, repo: str) -> str:
         return ""
  
 
-def bitbucket_request(self, params=None, method='GET', data=None, endpoint=''):
+def clone_repo(self, params=None, method='GET', data=None, endpoint=''):
     """
-    Make a request to the Bitbucket API.
+    Make a request to the Github API.
     Args:
         params (dict, optional): Query parameters for the request
         method (str): HTTP method ('GET' or 'POST')
         data (dict, optional): Data to send in the request body (for POST requests)
         endpoint (str): API endpoint to call (e.g., 'repositories/{owner}/{repo}/src')
     Returns:
-        dict: JSON response from the Bitbucket API
+        dict: JSON response from the Github API
     Raises:
         HTTPError: If the request fails
     """
-    url = f"https://bitbucketdc-cluster07.jpmchase.net/{endpoint}"
+    url = f"https://github.org/{endpoint}"
     if method == 'GET':
         response = requests.get(url, auth=(self.inputs.sid, self.inputs.password), params=params)
     elif method == 'POST':
@@ -377,13 +349,13 @@ def bitbucket_request(self, params=None, method='GET', data=None, endpoint=''):
     return response.json()
  
 
-@app.post("/webhook/bitbucket")
-async def bitbucket_webhook(request: Request, background_tasks: BackgroundTasks):
+@app.post("/webhook/github")
+async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     """
-    Webhook endpoint for Bitbucket events. This will be the dedicated entry point for all Bitbucket events.
+    Webhook endpoint for GitHub issue events. This will be the dedicated entry point for GitHub issue events.
     It immediately returns a 202 Accepted response and starts the generation process in the background.
     Args:
-        request: The incoming request containing the Bitbucket webhook payload
+        request: The incoming request containing the GitHub webhook payload
         background_tasks: FastAPI's BackgroundTasks for async processing
     Returns:
         A 202 Accepted response indicating the webhook was received and processing has started
@@ -391,16 +363,16 @@ async def bitbucket_webhook(request: Request, background_tasks: BackgroundTasks)
     try:
         # Parse the webhook payload
         payload = await request.json()
-        logger.info(f"Received Bitbucket webhook payload: {json.dumps(payload, indent=2)}")
+        logger.info(f"Received Github webhook payload: {json.dumps(payload, indent=2)}")
         # Log the event
-        event_key = payload.get("eventKey")
-        logger.info(f"Received Bitbucket webhook event: {event_key}")
+        action = payload.get("action")
+        logger.info(f"Received GitHub webhook event with action: {action}")
         # Validate HMAC-SHA256 signature
         signature = request.headers.get("X-Hub-Signature")
         if not signature:
             logger.error("Missing HMAC-SHA256 signature in webhook headers")
             raise HTTPException(status_code=400, detail="Missing HMAC-SHA256 signature")
-        # secret = os.environ.get("BITBUCKET_WEBHOOK_SECRET", "")
+        # secret = os.environ.get("Github_WEBHOOK_SECRET", "")
         # if not secret:
         #     logger.error("Webhook secret not configured in environment variables")
         #     raise HTTPException(status_code=500, detail="Webhook secret not configured")
@@ -408,37 +380,30 @@ async def bitbucket_webhook(request: Request, background_tasks: BackgroundTasks)
         # if not hmac.compare_digest(computed_signature, signature):
         #     logger.error("Invalid HMAC-SHA256 signature")
         #     raise HTTPException(status_code=403, detail="Invalid HMAC-SHA256 signature")
-        # Check if this is a repository push event
-        if event_key == "repo:refs_changed":
+        # Check if this is a GitHub issue event
+        if action == "closed":
             try:
-                # Parse the push event data
-                push_event = BitbucketPushEvent(**payload)
-                # Filter for main branch
-                changes = push_event.push.get("changes", [])
-                main_branch = os.environ.get("BITBUCKET_MAIN_BRANCH", "main")
-                if not any(change.get("new", {}).get("name") == main_branch for change in changes):
-                    logger.info(f"Push event does not target the main branch ({main_branch}). Skipping processing.")
-                    return JSONResponse(
-                        status_code=202,
-                        content={"message": f"Webhook received, but push event does not target the main branch ({main_branch})."}
-                    )
+                # Parse the issue event data
+                push_event = GithubPushEvent(**payload)
+                logger.info(f"Processing GitHub push event: {action} for push #{push_event.number}")
+
                 # Add the background task for processing
                 background_tasks.add_task(
-                    process_bitbucket_repository_async,
-                    repository=repository,
-                    actor_name=actor_name
+                    process_github_repository_async,
+                    github_event=push_event,
+                    actor_name=push_event.sender.login
                 )
-                logger.info(f"Background task added for processing repository: {repository.full_name}")
+                logger.info(f"Background task added for processing repository: {push_event.repository.full_name}")
                 return JSONResponse(
                     status_code=202,
-                    content={"message": f"Webhook received. Processing repository {repository.full_name} in background."}
+                    content={"message": f"Webhook received. Processing repository {push_event.repository.full_name} in background."}
                 )
             except Exception as e:
-                logger.error(f"Error parsing Bitbucket push event: {str(e)}", exc_info=True)
+                logger.error(f"Error parsing GitHub push event: {str(e)}", exc_info=True)
                 raise HTTPException(status_code=400, detail=f"Invalid push event format: {str(e)}")
         else:
             # For other event types, just acknowledge receipt
-            logger.info(f"Received unsupported Bitbucket event type: {event_key}")
+            logger.info(f"Received unsupported GitHub event with action: {action}")
             return JSONResponse(
                 status_code=202,
                 content={"message": "Webhook received, but event type is not supported for processing."}
