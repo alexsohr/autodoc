@@ -349,7 +349,7 @@ def clone_repo(self, params=None, method='GET', data=None, endpoint=''):
     return response.json()
  
 
-@app.post("/webhook/github")
+@app.post("/webhook")
 async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Webhook endpoint for GitHub issue events. This will be the dedicated entry point for GitHub issue events.

@@ -48,7 +48,7 @@ class TestGitHubAPI(unittest.TestCase):
         """
         mock_compare_digest.return_value = True
         response = self.test_client.post(
-            "/webhook/github",
+            "/webhook",
             json=self.raw_json,
             headers=self.headers_mock
         )
