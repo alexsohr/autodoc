@@ -141,7 +141,12 @@ async def _process_chat_request(request: ChatCompletionRequest):
         model_messages.append({"role": "system", "content": system_prompt})
 
     for message in request.messages:
-        role = "model" if message.role == "assistant" else "user"
+        # Use provider-specific role mapping
+        if request.provider == "google":
+            role = "model" if message.role == "assistant" else "user"
+        else:
+            # For OpenAI, OpenRouter, Ollama, Bedrock - use standard roles
+            role = message.role  # Keep original role (assistant/user)
         model_messages.append({"role": role, "content": message.content})
         
     return model_messages, system_prompt
@@ -223,4 +228,4 @@ async def chat_completions(request: ChatCompletionRequest):
 @app.get("/")
 async def root():
     """Root endpoint to check if the API is running"""
-    return {"message": "Welcome to the Simple Chat API"}
+    return {"message": "Welcome to the Simple Chat API"} 
