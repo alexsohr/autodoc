@@ -1,8 +1,14 @@
+"""Manual script for testing the AutoDoc streaming API.
+
+This module provides ``run_streaming_test`` which can be executed from the
+command line but is not intended for automated ``pytest`` runs.
+"""
+
 import requests
 import json
 import sys
 
-def test_streaming_endpoint(repo_url, query, file_path=None):
+def run_streaming_test(repo_url, query, file_path=None):
     """
     Test the streaming endpoint with a given repository URL and query.
     
@@ -67,4 +73,4 @@ if __name__ == "__main__":
     query = sys.argv[2]
     file_path = sys.argv[3] if len(sys.argv) > 3 else None
     
-    test_streaming_endpoint(repo_url, query, file_path)
+    run_streaming_test(repo_url, query, file_path)

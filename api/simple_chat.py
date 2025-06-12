@@ -128,13 +128,42 @@ async def _process_chat_request(request: ChatCompletionRequest):
         logger.error(f"Error in RAG retrieval: {str(e)}", exc_info=True)
 
     repo_name = request.repo_url.split("/")[-1]
-    system_prompt_template = configs.get('lang_config', {}).get('languages', {}).get(request.language, {}).get('system_prompt', "{repo_name} - {repo_url}\n\n{context_text}\n\nFile: {file_path}")
-    system_prompt = system_prompt_template.format(
-        repo_name=repo_name,
-        repo_url=request.repo_url,
-        context_text=context_text,
-        file_path=request.filePath or "the repository"
-    )
+    
+    # Create system prompt with knowledge base constraints
+    if context_text.strip():
+        # When we have context, use knowledge base constraints
+        system_prompt = f"""You are a code assistant which answers user questions about the Github Repository: {repo_name} - {request.repo_url}
+
+CRITICAL KNOWLEDGE BASE CONSTRAINT:
+- You MUST ONLY answer questions based on the provided context from the repository's knowledge base
+- If the information is not available in the provided context, you MUST respond with: "I cannot find this information in the knowledge base for this repository."
+- DO NOT use external knowledge or make assumptions beyond what is explicitly provided in the context
+- DO NOT answer questions about topics not covered in the repository context
+
+CONTEXT FROM REPOSITORY:
+{context_text}
+
+FILE FOCUS: {request.filePath or "the repository"}
+
+FORMAT YOUR RESPONSE USING MARKDOWN:
+- Use proper markdown syntax for all formatting
+- For code blocks, use triple backticks with language specification
+- Use ## headings for major sections
+- Use bullet points or numbered lists where appropriate
+- Use **bold** and *italic* for emphasis
+- When referencing file paths, use `inline code` formatting
+
+Respond only based on the provided repository context above."""
+    else:
+        # When we have no context, inform the user
+        system_prompt = f"""You are a code assistant for the Github Repository: {repo_name} - {request.repo_url}
+
+I cannot find relevant information in the knowledge base for this repository to answer your question. This could be because:
+1. The repository hasn't been fully indexed yet
+2. Your question is about topics not covered in the available documentation
+3. The retrieval system couldn't find matching content
+
+Please try rephrasing your question or ask about specific files, features, or components that might be documented in the repository."""
     
     model_messages = []
     if system_prompt and request.provider != "google":
@@ -216,7 +245,20 @@ async def chat_completions(request: ChatCompletionRequest):
             "stream": False
         }
         response = await client.acall(api_kwargs=api_kwargs, model_type=ModelType.LLM)
-        full_response = response.raw_response if response and response.raw_response else ""
+        
+        # Extract content from the response object
+        full_response = ""
+        if response and hasattr(response, 'choices') and response.choices:
+            # For OpenAI-style responses
+            choice = response.choices[0]
+            if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
+                full_response = choice.message.content or ""
+        elif response and hasattr(response, 'raw_response'):
+            # For other providers that might have raw_response
+            full_response = response.raw_response if response.raw_response else ""
+        elif response:
+            # Fallback: try to convert response to string
+            full_response = str(response)
 
         return JSONResponse(content={"role": "assistant", "content": full_response})
 

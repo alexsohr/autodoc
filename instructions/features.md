@@ -155,14 +155,21 @@ The config.yml file uses YAML, a popular data format chosen for its human-readab
     ```json
     {
         "mcpServers": {
-            "autodoc-repo-name": {
-            "command": "python",
-            "args": [
-                "-m",
-                "mcp.server",
-                "--param",
-                "repo_url=&lt;TARGET_REPOSITORY_URL>"
-            ]
+            "autodoc": {
+                "command": "uv",
+                "args": [
+                    "run",
+                    "--with", "fastmcp>=2.8.0",
+                    "--with", "httpx>=0.28.0",
+                    "python",
+                    "/mnt/e/projects/autodoc/autodoc/mcp/mcp-server.py"
+                ],
+                "env": {
+                    "AUTODOC_SERVER_URL": "http://localhost:3000",
+                    "REPO_URL": "https://github.com/alexsohr/autodoc",
+                    "MCP_REQUEST_TIMEOUT": "30.0",
+                    "DEBUG": "true"
+                }
             }
         }
     }

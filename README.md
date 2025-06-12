@@ -19,6 +19,7 @@
 - **Ask Feature**: Chat with your repository using RAG-powered AI to get accurate answers
 - **DeepResearch**: Multi-turn research process that thoroughly investigates complex topics
 - **Multiple Model Providers**: Support for Google Gemini, OpenAI, OpenRouter, and local Ollama models
+- **MCP Integration**: Model Context Protocol server for AI assistants ([see MCP docs](./mcp/README.md))
 
 ## 🚀 Quick Start (Super Easy!)
 
@@ -151,6 +152,11 @@ autodoc/
 │   ├── rag.py            # Retrieval Augmented Generation
 │   ├── data_pipeline.py  # Data processing utilities
 │   └── requirements.txt  # Python dependencies
+│
+├── mcp/                  # Model Context Protocol server
+│   ├── mcp-server.py     # MCP server implementation
+│   ├── requirements.txt  # MCP dependencies
+│   └── README.md         # MCP documentation
 │
 ├── src/                  # Frontend Next.js app
 │   ├── app/              # Next.js app directory
