@@ -133,7 +133,10 @@ The config.yml file uses YAML, a popular data format chosen for its human-readab
     * read_wiki_contents(topic: str)**:** This tool will make a GET request to a new endpoint (e.g., http://localhost:3000/api/wiki-content?repo_url=...&topic=...) to get the content.
     * ask_question(question: str)**:** This tool will make a POST request to the existing "Ask" feature's API (eg., http://localhost:3000/api/chat/completions?...) endpoint, passing the repo_url and question.
 5. **Autodoc server url:**
-    * Read the autodoc server url from environment variable AUTODOC_SERVER_URL
+    * Read the autodoc server url from environment variable AUTODOC_SERVER_URL that is defined in the mcp client 
+    * Create an API route in src/api to return cached wiki structures for a repository
+    * Create another API route in src/api to fetch specific wiki content topics
+    * Use the apis in src/api in mcp-server.py
 
 
 ### Feature 5: MCP Configuration UI for Local Server
@@ -162,7 +165,10 @@ The config.yml file uses YAML, a popular data format chosen for its human-readab
                 "mcp.server",
                 "--param",
                 "repo_url=&lt;TARGET_REPOSITORY_URL>"
-            ]
+            ], 
+            "env": {
+                "AUTODOC_SERVER_URL": "http://localhost:3000"
+            }
             }
         }
     }
