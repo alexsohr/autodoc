@@ -192,7 +192,7 @@ Add this configuration to your Cursor MCP settings:
       "--with", "fastmcp>=2.8.0",
       "--with", "httpx>=0.28.0",
       "python",
-      "/path/to/your/autodoc/mcp/mcp-server.py"
+      "<PATH_TO_YOUR_AUTODOC_MCP>/mcp-server.py"
     ],
     "env": {
       "AUTODOC_SERVER_URL": "http://localhost:3000",
@@ -213,7 +213,7 @@ If you prefer not to use `uv`, you can run the server directly with Python:
   "mcpServers": {
     "autodoc": {
       "command": "python",
-      "args": ["/path/to/your/autodoc/mcp/mcp-server.py"],
+      "args": ["<PATH_TO_YOUR_AUTODOC_MCP>/mcp-server.py"],
       "env": {
         "AUTODOC_SERVER_URL": "http://localhost:3000",
         "REPO_URL": "https://github.com/your-username/your-repo",
