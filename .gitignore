@@ -64,3 +64,5 @@ yarn-error.log*
 next-env.d.ts
 
 .idea/
+yarn.lock
+.vscode/settings.json
