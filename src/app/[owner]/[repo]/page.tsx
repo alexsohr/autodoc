@@ -3,7 +3,7 @@
 
 import React, { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { FaExclamationTriangle, FaBookOpen, FaGithub, FaGitlab, FaBitbucket, FaDownload, FaFileExport, FaHome, FaFolder, FaSync, FaChevronUp, FaChevronDown, FaComments, FaTimes } from 'react-icons/fa';
+import { FaExclamationTriangle, FaBookOpen, FaGithub, FaGitlab, FaBitbucket, FaDownload, FaFileExport, FaHome, FaFolder, FaSync, FaChevronUp, FaChevronDown, FaComments, FaTimes, FaCheck, FaSpinner } from 'react-icons/fa';
 import Link from 'next/link';
 import ThemeToggle from '@/components/theme-toggle';
 import Markdown from '@/components/Markdown';
@@ -1814,26 +1814,30 @@ IMPORTANT:
                         : `${wikiStructure.pages.length - pagesInProgress.size} of ${wikiStructure.pages.length} pages completed`}
                 </p>
 
-                {/* Show list of in-progress pages */}
-                {pagesInProgress.size > 0 && (
+                {/* Show list of all pages with status */}
+                {wikiStructure.pages.length > 0 && (
                   <div className="mt-4 text-xs">
                     <p className="text-[var(--muted)] mb-2">
-                      {messages.repoPage?.currentlyProcessing || 'Currently processing:'}
+                      {messages.repoPage?.pageGenerationStatus || 'Page Generation Status:'}
                     </p>
-                    <ul className="text-[var(--foreground)] space-y-1">
-                      {Array.from(pagesInProgress).slice(0, 3).map(pageId => {
-                        const page = wikiStructure.pages.find(p => p.id === pageId);
-                        return page ? <li key={pageId} className="truncate border-l-2 border-[var(--accent-primary)]/30 pl-2">{page.title}</li> : null;
+                    <ul className="text-[var(--foreground)] space-y-1 max-h-48 overflow-y-auto">
+                      {wikiStructure.pages.map(page => {
+                        const isInProgress = pagesInProgress.has(page.id);
+                        const isCompleted = generatedPages[page.id] && generatedPages[page.id].content && generatedPages[page.id].content !== 'Loading...';
+                        
+                        return (
+                          <li key={page.id} className="flex items-center gap-2 border-l-2 border-[var(--accent-primary)]/30 pl-2">
+                            {isInProgress ? (
+                              <FaSpinner className="animate-spin text-[var(--accent-primary)] flex-shrink-0" />
+                            ) : isCompleted ? (
+                              <FaCheck className="text-green-500 flex-shrink-0" />
+                            ) : (
+                              <div className="w-3 h-3 border border-[var(--muted)] rounded-full flex-shrink-0" />
+                            )}
+                            <span className="truncate">{page.title}</span>
+                          </li>
+                        );
                       })}
-                      {pagesInProgress.size > 3 && (
-                        <li className="text-[var(--muted)]">
-                          {language === 'ja'
-                            ? `...他に${pagesInProgress.size - 3}ページ`
-                            : messages.repoPage?.andMorePages
-                                ? messages.repoPage.andMorePages.replace('{count}', (pagesInProgress.size - 3).toString())
-                                : `...and ${pagesInProgress.size - 3} more`}
-                        </li>
-                      )}
                     </ul>
                   </div>
                 )}
