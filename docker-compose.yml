@@ -7,11 +7,12 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${PORT:-8001}:${PORT:-8001}"  # API port
-      - "3000:3000"  # Next.js port
+      - "${NEXT_PORT:-3000}:${NEXT_PORT:-3000}"  # Next.js port (configurable)
     env_file:
       - .env
     environment:
       - PORT=${PORT:-8001}
+      - NEXT_PORT=${NEXT_PORT:-3000}
       - NODE_ENV=production
       - SERVER_BASE_URL=http://localhost:${PORT:-8001}
       - NEXT_PUBLIC_SERVER_BASE_URL=http://localhost:${PORT:-8001}
@@ -23,6 +24,8 @@ services:
     # Resource limits for docker-compose up (not Swarm mode)
     mem_limit: 6g
     mem_reservation: 2g
+    # Restart policy to handle crashes gracefully
+    restart: unless-stopped
     # Health check configuration
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8001}/health"]
@@ -30,3 +33,5 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    # Ensure clean shutdown
+    stop_grace_period: 30s
