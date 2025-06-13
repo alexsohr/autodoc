@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Dict, Any
 
 
@@ -23,6 +23,8 @@ class Repository(BaseModel):
         id (int): The unique ID of the repository
         full_name (str): The full name of the repository (e.g., 'octocat/Hello-World')
         owner (Owner): The owner of the repository
+        html_url (str): The URL of the repository
+        default_branch (str): The default branch of the repository
     Returns:
         This class does not return anything
     """

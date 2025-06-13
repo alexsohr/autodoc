@@ -23,7 +23,7 @@ from api.web_hook.github_prompts import generate_wiki_structure_prompt
 
 from dotenv import load_dotenv
 from api.data_pipeline import DatabaseManager
-from api.web_hook.github_api_herlpers import parse_wiki_pages_from_xml, parse_wiki_sections_from_xml
+from api.web_hook.github_api_herlpers import parse_wiki_pages_from_xml, parse_wiki_sections_from_xml, generate_page_content
 
 load_dotenv()
 
@@ -135,123 +135,114 @@ def parse_wiki_structure(xml_text: str) -> Tuple[str, str, List[dict]]:
         pages.append(page)
     return title, description, pages
 
-MAX_RETRIES = 3
-
-async def generate_page_content(
-    page: Dict,
-    owner: str,
+async def export_wiki_python(
+    wiki_structure: WikiStructure,
+    generated_pages: dict,
     repo: str,
-    repo_url: str, # Object/Dictionary with owner, repo, type, etc.
-    generated_pages = {}, # Dictionary to hold generated content
-) -> Dict:
-    page_id = page['id']
-    page_title = page['title']
-    file_paths = page['filePaths']
+    repo_url: str,
+    export_format: str = 'json',  # 'markdown' or 'json'
+    api_base_url: str = "http://localhost:8001" # Base URL for your API
+) -> tuple[str | None, str | None]:
+    """
+    Exports the wiki content by calling an API and saving the result.
+
+    Args:
+        wiki_structure: Dictionary containing the wiki structure (e.g., list of pages).
+        generated_pages: Dictionary mapping page IDs to their generated content.
+        repo: Repository name.
+        repo_url: Repository URL.
+        export_format: The desired export format ('markdown' or 'json').
+        api_base_url: The base URL of the API server (e.g., "http://localhost:8001").
+
+    Returns:
+        A tuple (error_message_or_none, saved_filepath_or_none).
+    """
+    print("here")
+    logger.info(f"Exporting wiki for {repo} in {export_format} format")
+    export_error_message: str | None = None
+
+    # Initial check
+    if not wiki_structure or not wiki_structure.pages or not generated_pages:
+        export_error_message = 'No wiki content to export'
+        print(f"Error: {export_error_message}")
+        return export_error_message, None
 
     try:
-        # --- Input Validation ---
-        if not owner or not repo:
-            raise ValueError('Invalid repository information. Owner and repo name are required.')
+        # Prepare the pages for export
+        pages_to_export = []
+        for page in wiki_structure.pages:
+            page_id = page.get('id')
+            content = ""
+            if page_id and page_id in generated_pages:
+                content = generated_pages[page_id].get('content', "Content not generated")
+            
+            pages_to_export.append({
+                **page,  # Spread operator equivalent
+                'content': content
+            })
 
-        # Update generated_pages with a placeholder
-        generated_pages[page_id] = {**page, 'content': 'Loading...'}
-
-        # --- Prompt Construction ---
-        # This part translates directly using Python f-strings or .format()
-        file_list_markdown = '\n'.join([f"- [{path}]({path})" for path in file_paths])
-        prompt_content = generate_wiki_page_prompt(page_title, file_list_markdown, file_paths)
-
-        # --- Prepare Request Body ---
-        request_body = {
+        # Prepare API request payload
+        payload = {
             'repo_url': repo_url,
             'type': 'github',
-            'messages': [{
-                'role': 'user',
-                'content': prompt_content
-            }],
-            'language': 'English'
+            'pages': pages_to_export,
+            'format': export_format
         }
 
-        content = ''
-        last_error = None
+        api_endpoint = f"{api_base_url.rstrip('/')}/export/wiki"
 
-        # --- Retry Logic ---
-        for attempt in range(1, MAX_RETRIES + 1):
-            logger.info(f"Attempt {attempt}/{MAX_RETRIES} for page: {page_title}")
-            content = '' # Reset content for each attempt
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                api_endpoint,
+                json=payload, # aiohttp handles json.dumps for the json parameter
+                headers={'Content-Type': 'application/json'}
+            ) as response:
+                if not response.ok:
+                    error_text = "No error details available"
+                    try:
+                        error_text = await response.text()
+                    except Exception:
+                        pass  # Keep default error_text if response.text() fails
+                    raise Exception(f"Error exporting wiki: {response.status} - {error_text}")
 
-            try:
-                # --- WebSocket Attempt ---
-                # Need to determine the server base URL in Python context
-                server_base_url = 'http://localhost:8001' # Example
-                ws_base_url = server_base_url.replace('http', 'ws')
-                ws_url = f"{ws_base_url}/ws/chat"
+                # Get the filename from the Content-Disposition header or generate a default
+                content_disposition = response.headers.get('Content-Disposition')
+                file_ext = 'md' if export_format == 'markdown' else 'json'
+                # Use .get with a default for repo name
+                repo_name_for_file = repo
+                filename = f"{repo_name_for_file}_wiki.{file_ext}"
 
-                try:
-                    async with websockets.connect(ws_url) as websocket:
-                        logger.info(f"WebSocket connection established for page: {page_title} (attempt {attempt})")
-                        await websocket.send(json.dumps(request_body))
+                if content_disposition:
+                    # Regex to find filename="filename.ext" or filename=filename.ext
+                    match = re.search(r'filename=(?:"([^"]+)"|([^;]+))', content_disposition)
+                    if match:
+                        # Group 1 for quoted filename, Group 2 for unquoted
+                        extracted_filename = match.group(1) or match.group(2)
+                        if extracted_filename:
+                            filename = extracted_filename.strip()
+                
+                # Get binary content of the response
+                blob_data = await response.read()
 
-                        # Receive messages
-                        # Collect all response chunks
-                        async for message in websocket:
-                            try:
-                                content += message
-                            except asyncio.TimeoutError:
-                                logger.warning(f"WebSocket read timeout for page: {page_title}")
-                                break
-                            except Exception as e:
-                                logger.error(f"WebSocket receive error for page {page_title}: {e}")
-                                raise e # Re-raise to trigger fallback
+                # Save the file locally (Python equivalent of browser download)
+                # You might want to save it to a specific directory, e.g., a 'downloads' folder
+                save_path = os.path.join(".", filename)  # Saves in the current working directory
+                with open(save_path, 'wb') as f:
+                    f.write(blob_data)
+                
+                print(f"Wiki exported successfully to: {os.path.abspath(save_path)}")
+                return None, os.path.abspath(save_path) # No error, path to saved file
 
-                        logger.info(f"WebSocket response complete. Total length: {len(content)}")
-                    logger.info(f"WebSocket connection closed for page: {page_title} (attempt {attempt})")
-                    # If we reach here, WebSocket was successful (at least connection and initial send)
-                    # The content variable holds the received data.
-                    if content: # Check if any content was received
-                         logger.info(f"Successfully generated content for {page_title} via WebSocket on attempt {attempt}, length: {len(content)} characters")
-                         break # Exit retry loop on success
+    except Exception as e:
+        error_message = str(e)
+        print(f"Error during wiki export: {error_message}")
+        export_error_message = error_message
+        return export_error_message, None
+    finally:
+        # is_exporting = False
+        # loading_message = None
+        print("Export process finished.")
 
-                except Exception as ws_error:
-                    logger.error(f"WebSocket error on attempt {attempt}, falling back to HTTP: {ws_error}")
-
-            except Exception as err:
-                last_error = err
-                logger.error(f"Attempt {attempt}/{MAX_RETRIES} failed for page {page_id}: {err}")
-
-                # If this is not the last attempt, wait
-                if attempt < MAX_RETRIES:
-                    wait_time = attempt * 1 # Progressive backoff: 1s, 2s, 3s
-                    logger.info(f"Waiting {wait_time}s before retry...")
-                    await asyncio.sleep(wait_time)
-
-        # --- Check if all retries failed ---
-        if not content and last_error:
-            raise last_error
-
-        # --- Clean up markdown delimiters ---
-        content = content.strip() # Remove leading/trailing whitespace
-        if content.lower().startswith('```markdown'):
-             content = content[len('```markdown'):].lstrip()
-        if content.lower().endswith('```'):
-             content = content[:-len('```')].rstrip()
-
-
-        # --- Store the FINAL generated content (Simulated) ---
-        updated_page = {**page, 'content': content}
-        generated_pages[page_id] = updated_page
-        return generated_pages
-
-    except Exception as err:
-        logger.error(f"Error generating content for page {page_id} after {MAX_RETRIES} attempts: {err}")
-        error_message = str(err) if isinstance(err, Exception) else 'Unknown error'
-        # Update page state to show error (Simulated)
-        generated_pages[page_id] = {**page, 'content': f"Error generating content after {MAX_RETRIES} retries: {error_message}"}
-        # Set global error state (Simulated)
-        # set_error(f"Failed to generate content for {page_title} after {MAX_RETRIES} retries.")
-        # Resolve even on error to unblock queue (Simulated)
-        # This might involve signaling completion for this specific page task.
- 
 
 async def process_github_repository_async(github_event: GithubPushEvent, actor_name: str = None):
     """
@@ -377,6 +368,17 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
             'repo_url': repo_url
         }
         logger.info(f"Wiki generation complete for {owner}/{repo}")
+
+        wiki_structure = WikiStructure(
+            id='wiki',
+            title=title,
+            description=description,
+            pages=pages,
+            sections=sections,
+            root_sections=root_sections
+        )
+
+        await export_wiki_python(wiki_structure, generated_pages, repo, repo_url)
         return result
     except Exception as e:
         logger.error(f"Error processing Github repository {github_event.repository.full_name}: {str(e)}", exc_info=True)
