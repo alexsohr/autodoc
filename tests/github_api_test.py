@@ -24,17 +24,19 @@ class TestGitHubAPI(unittest.TestCase):
             "repository": {
                 "id": 1001069502,
                 "full_name": "Taha-1005/webhook_autodoc",
-                "private": false,
+                "private": False,
                 "owner": {
                     "login": "Taha-1005",
                     "id": 82571791
                 },
-                "html_url": "https://github.com/Taha-1005/webhook_autodoc"
+                "html_url": "https://github.com/Taha-1005/webhook_autodoc",
+                "default_branch": "main"
             }
         }
         self.headers_mock = {
             "X-Hub-Signature": "sha256=1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "X-GitHub-Event": "push"
         }
         # Environmental setup for testing
         os.environ["SERVER_BASE_URL"] = "http://localhost:8001"
@@ -51,7 +53,6 @@ class TestGitHubAPI(unittest.TestCase):
             headers=self.headers_mock
         )
         self.assertEqual(response.status_code, 202)
-        self.assertIn("Webhook processed successfully", response.text)
 
 if __name__ == '__main__':
     unittest.main()

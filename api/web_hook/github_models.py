@@ -28,6 +28,8 @@ class Repository(BaseModel):
     full_name: str
     owner: Owner
     html_url: str
+    default_branch: str
+
 
 class GithubPushEvent(BaseModel):
     """

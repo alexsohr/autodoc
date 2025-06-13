@@ -3,6 +3,7 @@ import json
 import hmac
 import re
 import logging
+import ssl
 import aiohttp
 import requests
 import xml.etree.ElementTree as ET
@@ -17,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.web_hook.github_prompts import generate_wiki_structure_prompt
 from api.websocket_wiki import handle_websocket_chat
 from dotenv import load_dotenv
+from api.data_pipeline import DatabaseManager
 
 load_dotenv()
 
@@ -128,23 +130,33 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         dict: Result containing wiki structure and generated pages
     """
     try:
-        repo_url = f"https://github.org/{github_event.repository.full_name}"
+        repo_url = github_event.repository.html_url
+        logger.info(f"Processing Github repository: {repo_url}")
         repo_parts = github_event.repository.full_name.split('/')
         if len(repo_parts) != 2:
             logger.error(f"Invalid repository full_name format: {github_event.repository.full_name}")
             return
         owner, repo = repo_parts
-        logger.info(f"Starting async wiki generation for Github repository: {owner}/{repo}")
+
+        # Create the repository structure
+        database_manager = DatabaseManager()
+        database_manager._create_repo(repo_url, "github")
+        repo_location = database_manager.repo_paths["save_repo_dir"]
+        logger.info(f"Saved the repo at {repo_location}")
+
         # Fetch file tree and README - fetchRepositoryUrl
-        file_tree = await get_repo_file_tree(owner, repo)
+        file_tree = await get_repo_file_tree(owner, repo, github_event.repository.default_branch)
         readme_content = await get_repo_readme(owner, repo)
-        logger.info(f"Fetched file tree and README for {owner}/{repo}")
+        logger.info(f"Successfully fetched file tree and README for {owner}/{repo} {readme_content[:100]}")
+        
+        logger.info(f"Starting async wiki generation for Github repository: {owner}/{repo}")
+        
         # Use the generate_github_wiki_structure_prompt function to generate the request body
         repo_url = f"https://github.org/{owner}/{repo}"
         # Prepare request body for wiki structure generation
         request_body = {
             "repo_url": repo_url, 
-            "type": "bitbucket",
+            "type": "github",
             "messages": [{
                 "role": "user",
                 "content": generate_wiki_structure_prompt(
@@ -260,40 +272,84 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         return {'error': str(e)}
  
 
-async def get_repo_file_tree(owner: str, repo: str) -> str:
+async def get_repo_file_tree(owner: str, repo: str, default_branch: str) -> str:
     """
     Get the file tree of a Github repository.
     Args:
         owner (str): Repository owner
         repo (str): Repository name
+        default_branch (str): Default branch name
     Returns:
         str: File tree as a string with one file per line
     """
     try:
-        # Get Github API token from environment
+        # Get GitHub API token from environment
         token = os.environ.get("GITHUB_API_TOKEN", "")
-        # Build API URL
-        api_url = f"https://api.github.org/2.0/repositories/{owner}/{repo}/src"
-        headers = {}
+
+        # Create headers for GitHub API
+        headers = {
+            'Accept': 'application/vnd.github.v3+json'
+        }
         if token:
-            headers["Authorization"] = f"Bearer {token}"
-        # Make API request
-        async with aiohttp.ClientSession() as session:
-            async with session.get(api_url, headers=headers, params={"recursive": "true"}) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    # Extract file paths from the response
-                    files = []
-                    for file_info in data.get("values", []):
-                        if file_info.get("type") == "commit_file":
-                            files.append(file_info.get("path", ""))
-                    return "\n".join(files)
-                else:
-                    logger.error(f"Failed to get repository file tree: {response.status}")
-                    return "Error: Failed to fetch repository file tree"
+            headers['Authorization'] = f'Bearer {token}'
+
+        # Try to get the tree data for common branch names, starting with default_branch
+        branches_to_try = [default_branch] if default_branch else []
+        # Remove duplicates while preserving order
+        branches_to_try = list(dict.fromkeys(branches_to_try))
+
+        tree_data = None
+        api_error_details = ''
+
+        # Create SSL context that handles certificate verification issues
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        # Create connector with SSL context
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+
+        async with aiohttp.ClientSession(connector=connector) as session:
+            for branch in branches_to_try:
+                api_url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{branch}?recursive=1"
+                logger.info(f"Fetching repository structure from branch: {branch}")
+
+                try:
+                    async with session.get(api_url, headers=headers) as response:
+                        if response.status == 200:
+                            tree_data = await response.json()
+                            logger.info('Successfully fetched repository structure')
+                            break
+                        else:
+                            error_data = await response.text()
+                            api_error_details = f"Status: {response.status}, Response: {error_data}"
+                            logger.error(f"Error fetching repository structure: {api_error_details}")
+                except Exception as err:
+                    logger.error(f"Network error fetching branch {branch}: {err}")
+                    continue
+
+        if not tree_data or 'tree' not in tree_data:
+            if api_error_details:
+                logger.error(f"Could not fetch repository structure. API Error: {api_error_details}")
+                return ""
+            else:
+                logger.error('Could not fetch repository structure. Repository might not exist, be empty or private.')
+                return ""
+
+        # Convert tree data to a string representation (filter for files only)
+        file_tree = tree_data['tree']
+        file_paths = [
+            item['path'] for item in file_tree
+            if item.get('type') == 'blob'  # 'blob' represents files, 'tree' represents directories
+        ]
+
+        file_tree_string = '\n'.join(file_paths)
+        logger.info(f"Successfully generated file tree with {len(file_paths)} files")
+        return file_tree_string
+
     except Exception as e:
         logger.error(f"Error getting file tree for {owner}/{repo}: {str(e)}", exc_info=True)
-        return f"Error: {str(e)}"
+        return ""
  
 
 async def get_repo_readme(owner: str, repo: str) -> str:
@@ -308,17 +364,28 @@ async def get_repo_readme(owner: str, repo: str) -> str:
     try:
         # Get Github API token from environment
         token = os.environ.get("GITHUB_API_TOKEN", "")
-        # Build API URL - try common README filenames
-        readme_files = ["README.md", "README.rst", "README.txt", "README"]
-        headers = {}
+        headers = {
+            'Accept': 'application/vnd.github.v3+json'
+        }
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        async with aiohttp.ClientSession() as session:
-            for readme_file in readme_files:
-                api_url = f"https://api.github.org/2.0/repositories/{owner}/{repo}/src/master/{readme_file}"
-                async with session.get(api_url, headers=headers) as response:
-                    if response.status == 200:
-                        return await response.text()
+        # Create SSL context that handles certificate verification issues
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        # Create connector with SSL context
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+
+        async with aiohttp.ClientSession(connector=connector) as session:
+            # Try GitHub API first
+            api_url = f"https://api.github.com/repos/{owner}/{repo}/readme"
+            async with session.get(api_url, headers=headers) as response:
+                if response.status == 200:
+                    readme_data = await response.json()
+                    # GitHub API returns base64 encoded content
+                    import base64
+                    return base64.b64decode(readme_data['content']).decode('utf-8')
             # If no README found, return empty string
             logger.warning(f"No README found for repository {owner}/{repo}")
             return ""
@@ -394,8 +461,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
                 # Add the background task for processing
                 background_tasks.add_task(
                     process_github_repository_async,
-                    github_event=push_event,
-                    actor_name=push_event.sender.login
+                    github_event=push_event
                 )
                 logger.info(f"Background task added for processing repository: {push_event.repository.full_name}")
                 return JSONResponse(
