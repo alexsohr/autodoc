@@ -451,8 +451,14 @@ Remember:
 
               // Create a promise that resolves when the WebSocket connection is complete
               await new Promise<void>((resolve, reject) => {
+                // If the connection doesn't open within 5 seconds, fall back to HTTP
+                const timeout = setTimeout(() => {
+                  reject(new Error('WebSocket connection timeout'));
+                }, 5000);
+
                 // Set up event handlers
                 ws.onopen = () => {
+                  clearTimeout(timeout);
                   console.log(`WebSocket connection established for page: ${page.title} (attempt ${attempt})`);
                   // Send the request as JSON
                   ws.send(JSON.stringify(requestBody));
@@ -460,22 +466,9 @@ Remember:
                 };
 
                 ws.onerror = (error) => {
+                  clearTimeout(timeout);
                   console.error('WebSocket error:', error);
                   reject(new Error('WebSocket connection failed'));
-                };
-
-                // If the connection doesn't open within 5 seconds, fall back to HTTP
-                const timeout = setTimeout(() => {
-                  reject(new Error('WebSocket connection timeout'));
-                }, 5000);
-
-                // Clear the timeout if the connection opens successfully
-                ws.onopen = () => {
-                  clearTimeout(timeout);
-                  console.log(`WebSocket connection established for page: ${page.title} (attempt ${attempt})`);
-                  // Send the request as JSON
-                  ws.send(JSON.stringify(requestBody));
-                  resolve();
                 };
               });
 
@@ -757,8 +750,14 @@ IMPORTANT:
 
         // Create a promise that resolves when the WebSocket connection is complete
         await new Promise<void>((resolve, reject) => {
+          // If the connection doesn't open within 5 seconds, fall back to HTTP
+          const timeout = setTimeout(() => {
+            reject(new Error('WebSocket connection timeout'));
+          }, 5000);
+
           // Set up event handlers
           ws.onopen = () => {
+            clearTimeout(timeout);
             console.log('WebSocket connection established for wiki structure');
             // Send the request as JSON
             ws.send(JSON.stringify(requestBody));
@@ -766,22 +765,9 @@ IMPORTANT:
           };
 
           ws.onerror = (error) => {
+            clearTimeout(timeout);
             console.error('WebSocket error:', error);
             reject(new Error('WebSocket connection failed'));
-          };
-
-          // If the connection doesn't open within 5 seconds, fall back to HTTP
-          const timeout = setTimeout(() => {
-            reject(new Error('WebSocket connection timeout'));
-          }, 5000);
-
-          // Clear the timeout if the connection opens successfully
-          ws.onopen = () => {
-            clearTimeout(timeout);
-            console.log('WebSocket connection established for wiki structure');
-            // Send the request as JSON
-            ws.send(JSON.stringify(requestBody));
-            resolve();
           };
         });
 
