@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Import the FastAPI app instance
 from api.web_hook.github_prompts import generate_wiki_structure_prompt
-from api.websocket_wiki import handle_websocket_chat
+
 from dotenv import load_dotenv
 from api.data_pipeline import DatabaseManager
 
@@ -147,15 +147,18 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         # Fetch file tree and README - fetchRepositoryUrl
         file_tree = await get_repo_file_tree(owner, repo, github_event.repository.default_branch)
         readme_content = await get_repo_readme(owner, repo)
-        logger.info(f"Successfully fetched file tree and README for {owner}/{repo} {readme_content[:100]}")
+        logger.info(f"First 100 chars of README for {owner}/{repo}: {readme_content[:100]}")
         
         logger.info(f"Starting async wiki generation for Github repository: {owner}/{repo}")
-        
         # Use the generate_github_wiki_structure_prompt function to generate the request body
         repo_url = f"https://github.org/{owner}/{repo}"
         # Prepare request body for wiki structure generation
+        # Create WebSocket connection to get AI response (like the frontend does)
+        import websockets
+
+        # Create request body for WebSocket
         request_body = {
-            "repo_url": repo_url, 
+            "repo_url": repo_url,
             "type": "github",
             "messages": [{
                 "role": "user",
@@ -167,14 +170,51 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
                 )
             }]
         }
-        response = await handle_websocket_chat(
-            request_body=request_body,
-        )
-        response = re.sub(r'^```(?:xml)?\s*', '', response, flags=re.IGNORECASE)
-        response = re.sub(r'```\s*$', '', response, flags=re.IGNORECASE)
-        match = re.search(r"<wiki_structure>[\s\S]*?</wiki_structure>", response, re.MULTILINE)
-        xmlMatch = match.group(0) if match else None
+
+        # WebSocket URL (assuming the server is running on localhost:8001)
+        ws_url = "ws://localhost:8001/ws/chat"
+
+        ai_response = ""
+
+        try:
+            # Connect to WebSocket and get response
+            async with websockets.connect(ws_url) as websocket:
+                logger.info("WebSocket connection established for wiki structure generation")
+
+                # Send the request as JSON
+                await websocket.send(json.dumps(request_body))
+                logger.info("Sent request to WebSocket")
+
+                # Collect all response chunks
+                async for message in websocket:
+                    ai_response += message
+                    logger.debug(f"Received chunk: {len(message)} characters")
+
+                logger.info(f"WebSocket response complete. Total length: {len(ai_response)}")
+
+        except Exception as e:
+            logger.error(f"WebSocket connection failed: {e}")
+
+        logger.info(f"Wiki structure response length: {len(ai_response)}")
+
+        # Check if response is empty
+        if not ai_response or ai_response.strip() == "":
+            logger.error("Wiki structure response is empty - this indicates an issue with the model call")
+            raise ValueError("Wiki structure response is empty")
+
+        # Process the response
+        wiki_structure_xml = await process_wiki_structure_response(ai_response)
+
+        if not match:
+            logger.error(f"No valid XML structure found in AI response. Response length: {len(ai_response)}")
+            logger.error(f"First 500 chars of response: {ai_response[:500]}")
+            raise ValueError("No valid XML structure found in AI response")
+
+        xmlMatch = match.group(0)
         xmlText = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', xmlMatch)
+        logger.info(f"Successfully extracted XML structure with length: {len(xmlText)}")
+        logger.info(f"First 200 chars of XML: {xmlText[:200]}")
+        
         # xml_text is your XML string
         root = ET.fromstring(xmlText)
         title_el = root.find('title')
@@ -182,14 +222,16 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         pages_els = root.findall('.//page')
         title = title_el.text if title_el is not None else ''
         description = description_el.text if description_el is not None else ''
+        logger.info(f"The number of pages are {len(pages_els)}")
+
         pages = []
-        # TODO: Add retyr ability
+        # TODO: Add retry ability
         for page_el in pages_els:
             id_ = page_el.get('id', f'page-{len(pages) + 1}')
             title_el = page_el.find('title')
             importance_el = page_el.find('importance')
-            file_path_els = page_el.findall('file_path')
-            related_els = page_el.findall('related')
+            file_path_els = page_el.findall('.//file_path')
+            related_els = page_el.findall('.//related')
             title = title_el.text if title_el is not None else ''
             importance = 'medium'
             if importance_el is not None:
