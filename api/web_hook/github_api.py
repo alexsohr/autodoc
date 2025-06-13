@@ -1,6 +1,7 @@
 import os
 import json
 import hmac
+import hashlib
 import re
 import logging
 import ssl
@@ -611,27 +612,27 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
         # Parse the webhook payload
         payload = await request.json()
+        body = await request.body()
         # Extract GitHub event type from headers
         github_event = request.headers.get("X-GitHub-Event")
         logger.info(f"Received GitHub webhook event: {github_event}")
         logger.info(f"Request headers: {request.headers}")
 
         pull_request_event = GithubPushEvent(**payload)
-        logger.info(f"Received GitHub webhook event with action: {pull_request_event.action}")
         # Validate HMAC-SHA256 signature
-        signature = request.headers.get("X-Hub-Signature")
+        signature = request.headers.get("X-Hub-Signature-256")
         if not signature:
             logger.error("Missing HMAC-SHA256 signature in webhook headers")
             raise HTTPException(status_code=400, detail="Missing HMAC-SHA256 signature")
-        # secret = os.environ.get("Github_WEBHOOK_SECRET", "")
-        # if not secret:
-        #     logger.error("Webhook secret not configured in environment variables")
-        #     raise HTTPException(status_code=500, detail="Webhook secret not configured")
-        # computed_signature = hmac.new(secret.encode(), await request.body(), hashlib.sha256).hexdigest()
-        # if not hmac.compare_digest(computed_signature, signature):
-        #     logger.error("Invalid HMAC-SHA256 signature")
-        #     raise HTTPException(status_code=403, detail="Invalid HMAC-SHA256 signature")
-        # Check if this is a GitHub issue event
+        secret = os.environ.get("Github_WEBHOOK_SECRET", "")
+        if not secret:
+            logger.error("Webhook secret not configured in environment variables")
+            raise HTTPException(status_code=500, detail="Webhook secret not configured")
+        hash_object = hmac.new(secret.encode('utf-8'), msg=body, digestmod=hashlib.sha256)
+        expected_signature = "sha256=" + hash_object.hexdigest()
+        if not hmac.compare_digest(expected_signature, signature):
+            raise HTTPException(status_code=403, detail="Request signatures didn't match!")
+
 
         if github_event == "pull_request" and pull_request_event.action == "closed" and \
             pull_request_event.pull_request.merged and \
