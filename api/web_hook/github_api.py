@@ -21,8 +21,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(
-    title="Streaming API",
-    description="API for streaming chat completions"
+    title="Github Wehook API",
+    description="API for webhooks"
 )
 
 # Configure CORS
@@ -363,7 +363,10 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
         # Parse the webhook payload
         payload = await request.json()
-        logger.info(f"Received Github webhook payload: {json.dumps(payload, indent=2)}")
+        headers = request.headers
+        # Extract GitHub event type from headers
+        github_event = request.headers.get("X-GitHub-Event")
+        logger.info(f"Received GitHub webhook event: {github_event}")
         # Log the event
         action = payload.get("action")
         logger.info(f"Received GitHub webhook event with action: {action}")
@@ -381,10 +384,11 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         #     logger.error("Invalid HMAC-SHA256 signature")
         #     raise HTTPException(status_code=403, detail="Invalid HMAC-SHA256 signature")
         # Check if this is a GitHub issue event
-        if action == "closed":
+        if action == "closed" and github_event == "push":
             try:
                 # Parse the issue event data
                 push_event = GithubPushEvent(**payload)
+                logger.info(f"Push event is {push_event}")
                 logger.info(f"Processing GitHub push event: {action} for push #{push_event.number}")
 
                 # Add the background task for processing
@@ -399,8 +403,8 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
                     content={"message": f"Webhook received. Processing repository {push_event.repository.full_name} in background."}
                 )
             except Exception as e:
-                logger.error(f"Error parsing GitHub push event: {str(e)}", exc_info=True)
-                raise HTTPException(status_code=400, detail=f"Invalid push event format: {str(e)}")
+                logger.error(f"Error parsing GitHub issue event: {str(e)}", exc_info=True)
+                raise HTTPException(status_code=400, detail=f"Invalid issue event format: {str(e)}")
         else:
             # For other event types, just acknowledge receipt
             logger.info(f"Received unsupported GitHub event with action: {action}")
@@ -414,4 +418,21 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    # Get port from environment variable or use default
+    webhook_port = int(os.environ.get("WEBHOOK_PORT", 8002))
+
+    logger.info(f"Starting GitHub Webhook API on port {webhook_port}")
+
+    # Run the webhook FastAPI app with uvicorn
+    uvicorn.run(
+        "api.web_hook.github_api:app",
+        host="0.0.0.0",
+        port=webhook_port,
+        reload=True  # Webhooks should be stable, no hot reload needed
+    )
 

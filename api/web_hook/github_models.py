@@ -27,6 +27,8 @@ class Repository(BaseModel):
     id: int
     full_name: str
     owner: Owner
+    html_url: str
+
 
 class Sender(BaseModel):
     """

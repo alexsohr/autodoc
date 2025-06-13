@@ -28,6 +28,8 @@ class TestGitHubAPI(unittest.TestCase):
                 "login": "octocat",
                 "id": 1,
                 },
+                "html_url": "https://github.com/octocat/Hello-World",
+                "private": False,
             },
             "sender": {
                 "login": "octocat",
