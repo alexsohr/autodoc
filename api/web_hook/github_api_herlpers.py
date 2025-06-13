@@ -5,6 +5,8 @@ import json
 import logging
 from api.web_hook.github_prompts import generate_wiki_page_prompt
 
+logger = logging.getLogger(__name__)
+
 MAX_RETRIES = 3
 
 def parse_wiki_pages_from_xml(pages_els) -> List[Dict]:
@@ -83,7 +85,9 @@ async def generate_page_content(
     page_title = page['title']
     file_paths = page['filePaths']
 
-    logger = logging.getLogger(__name__)
+    
+    if generated_pages is None:
+        generated_pages = {}
     try:
         # --- Input Validation ---
         if not owner or not repo:

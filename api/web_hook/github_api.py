@@ -67,49 +67,9 @@ def extract_wiki_structure_xml(wiki_structure_response, logger=None):
             logger.error(f"First 500 chars of response: {wiki_structure_response[:500]}")
         raise ValueError("No valid XML structure found in AI response")
 
-    xmlMatch = match.group(0)
-    xmlText = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', xmlMatch)
-    return xmlText
-
-async def generate_wiki_structure(owner: str, repo: str, file_tree: str, readme: str) -> str:
-    """
-    Generate the wiki structure XML using an LLM or stub.
-    Parameters:
-        owner (str): Repository owner
-        repo (str): Repository name
-        file_tree (str): File tree as string
-        readme (str): README content
-    Returns:
-        str: XML string representing the wiki structure
-    """
-    # For now, simulate LLM response for testing
-    # In production, call the LLM API here
-    return f"""
-<wiki_structure>
-  <title>{repo} Wiki</title>
-  <description>Auto-generated wiki for {owner}/{repo}</description>
-  <pages>
-    <page id=\"page-1\">
-      <title>Overview</title>
-      <description>Project overview</description>
-      <importance>high</importance>
-      <relevant_files>
-        <file_path>README.md</file_path>
-      </relevant_files>
-      <related_pages></related_pages>
-    </page>
-    <page id=\"page-2\">
-      <title>Architecture</title>
-      <description>System architecture</description>
-      <importance>high</importance>
-      <relevant_files>
-        <file_path>src/main.py</file_path>
-      </relevant_files>
-      <related_pages></related_pages>
-    </page>
-  </pages>
-</wiki_structure>
-"""
+    xml_match = match.group(0)
+    xml_text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', xml_match)
+    return xml_text
  
 
 def parse_wiki_structure(xml_text: str) -> Tuple[str, str, List[dict]]:
@@ -386,9 +346,9 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
 
 
         # Extract the XML structure from the response
-        xmlText = extract_wiki_structure_xml(wiki_structure_response, logger=logger)
+        xml_text = extract_wiki_structure_xml(wiki_structure_response, logger=logger)
         
-        root = ET.fromstring(xmlText)
+        root = ET.fromstring(xml_text)
         title_el = root.find('title')
         description_el = root.find('description')
         pages_els = root.findall('.//page')
@@ -427,7 +387,7 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
                 'description': description,
                 'pages': pages
             },
-            'generated_pages': "generated_pages",
+            'generated_pages': generated_pages,
             'repo_url': repo_url
         }
         logger.info(f"Wiki generation complete for {owner}/{repo}")
