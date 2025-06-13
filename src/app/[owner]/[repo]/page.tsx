@@ -3,7 +3,7 @@
 
 import React, { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { FaExclamationTriangle, FaBookOpen, FaGithub, FaGitlab, FaBitbucket, FaDownload, FaFileExport, FaHome, FaFolder, FaSync, FaChevronUp, FaChevronDown, FaComments, FaTimes } from 'react-icons/fa';
+import { FaExclamationTriangle, FaBookOpen, FaGithub, FaGitlab, FaBitbucket, FaDownload, FaFileExport, FaHome, FaFolder, FaSync, FaChevronUp, FaChevronDown, FaComments, FaTimes, FaCheck, FaSpinner } from 'react-icons/fa';
 import Link from 'next/link';
 import ThemeToggle from '@/components/theme-toggle';
 import Markdown from '@/components/Markdown';
@@ -287,6 +287,8 @@ export default function RepoWikiPage() {
   // Generate content for a wiki page
   const generatePageContent = useCallback(async (page: WikiPage, owner: string, repo: string) => {
     return new Promise<void>(async (resolve) => {
+      // Retry logic for content generation
+      const MAX_RETRIES = 3;
       try {
         // Skip if content already exists
         if (generatedPages[page.id]?.content) {
@@ -324,7 +326,7 @@ export default function RepoWikiPage() {
         }));
         setOriginalMarkdown(prev => ({ ...prev, [page.id]: '' })); // Clear previous original
 
-        // Make API call to generate page content
+        // Make API call to generate page content with retry logic
         console.log(`Starting content generation for page: ${page.title}`);
 
         // Get repository URL
@@ -427,112 +429,133 @@ Remember:
         // Add tokens if available
         addTokensToRequestBody(requestBody, currentToken, effectiveRepoInfo.type, selectedProviderState, selectedModelState, isCustomSelectedModelState, customSelectedModelState, language, modelExcludedDirs, modelExcludedFiles);
 
-        // Use WebSocket for communication
         let content = '';
+        let lastError: Error | null = null;
 
-        try {
-          // Create WebSocket URL from the server base URL
-          const serverBaseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL || 'http://localhost:8001';
-          const wsBaseUrl = serverBaseUrl.replace(/^http/, 'ws');
-          const wsUrl = `${wsBaseUrl}/ws/chat`;
-
-          // Create a new WebSocket connection
-          const ws = new WebSocket(wsUrl);
-
-          // Create a promise that resolves when the WebSocket connection is complete
-          await new Promise<void>((resolve, reject) => {
-            // Set up event handlers
-            ws.onopen = () => {
-              console.log(`WebSocket connection established for page: ${page.title}`);
-              // Send the request as JSON
-              ws.send(JSON.stringify(requestBody));
-              resolve();
-            };
-
-            ws.onerror = (error) => {
-              console.error('WebSocket error:', error);
-              reject(new Error('WebSocket connection failed'));
-            };
-
-            // If the connection doesn't open within 5 seconds, fall back to HTTP
-            const timeout = setTimeout(() => {
-              reject(new Error('WebSocket connection timeout'));
-            }, 5000);
-
-            // Clear the timeout if the connection opens successfully
-            ws.onopen = () => {
-              clearTimeout(timeout);
-              console.log(`WebSocket connection established for page: ${page.title}`);
-              // Send the request as JSON
-              ws.send(JSON.stringify(requestBody));
-              resolve();
-            };
-          });
-
-          // Create a promise that resolves when the WebSocket response is complete
-          await new Promise<void>((resolve, reject) => {
-            // Handle incoming messages
-            ws.onmessage = (event) => {
-              content += event.data;
-            };
-
-            // Handle WebSocket close
-            ws.onclose = () => {
-              console.log(`WebSocket connection closed for page: ${page.title}`);
-              resolve();
-            };
-
-            // Handle WebSocket errors
-            ws.onerror = (error) => {
-              console.error('WebSocket error during message reception:', error);
-              reject(new Error('WebSocket error during message reception'));
-            };
-          });
-        } catch (wsError) {
-          console.error('WebSocket error, falling back to HTTP:', wsError);
-
-          // Fall back to HTTP if WebSocket fails
-          const response = await fetch(`/api/chat/stream`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody)
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text().catch(() => 'No error details available');
-            console.error(`API error (${response.status}): ${errorText}`);
-            throw new Error(`Error generating page content: ${response.status} - ${response.statusText}`);
-          }
-
-          // Process the response
-          content = '';
-          const reader = response.body?.getReader();
-          const decoder = new TextDecoder();
-
-          if (!reader) {
-            throw new Error('Failed to get response reader');
-          }
-
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
           try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              content += decoder.decode(value, { stream: true });
+            console.log(`Attempt ${attempt}/${MAX_RETRIES} for page: ${page.title}`);
+            
+            // Reset content for each attempt
+            content = '';
+
+            // Use WebSocket for communication
+            try {
+              // Create WebSocket URL from the server base URL
+              const serverBaseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL || 'http://localhost:8001';
+              const wsBaseUrl = serverBaseUrl.replace(/^http/, 'ws');
+              const wsUrl = `${wsBaseUrl}/ws/chat`;
+
+              // Create a new WebSocket connection
+              const ws = new WebSocket(wsUrl);
+
+              // Create a promise that resolves when the WebSocket connection is complete
+              await new Promise<void>((resolve, reject) => {
+                // If the connection doesn't open within 5 seconds, fall back to HTTP
+                const timeout = setTimeout(() => {
+                  reject(new Error('WebSocket connection timeout'));
+                }, 5000);
+
+                // Set up event handlers
+                ws.onopen = () => {
+                  clearTimeout(timeout);
+                  console.log(`WebSocket connection established for page: ${page.title} (attempt ${attempt})`);
+                  // Send the request as JSON
+                  ws.send(JSON.stringify(requestBody));
+                  resolve();
+                };
+
+                ws.onerror = (error) => {
+                  clearTimeout(timeout);
+                  console.error('WebSocket error:', error);
+                  reject(new Error('WebSocket connection failed'));
+                };
+              });
+
+              // Create a promise that resolves when the WebSocket response is complete
+              await new Promise<void>((resolve, reject) => {
+                // Handle incoming messages
+                ws.onmessage = (event) => {
+                  content += event.data;
+                };
+
+                // Handle WebSocket close
+                ws.onclose = () => {
+                  console.log(`WebSocket connection closed for page: ${page.title} (attempt ${attempt})`);
+                  resolve();
+                };
+
+                // Handle WebSocket errors
+                ws.onerror = (error) => {
+                  console.error('WebSocket error during message reception:', error);
+                  reject(new Error('WebSocket error during message reception'));
+                };
+              });
+            } catch (wsError) {
+              console.error(`WebSocket error on attempt ${attempt}, falling back to HTTP:`, wsError);
+
+              // Fall back to HTTP if WebSocket fails
+              const response = await fetch(`/api/chat/stream`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+              });
+
+              if (!response.ok) {
+                const errorText = await response.text().catch(() => 'No error details available');
+                console.error(`API error (${response.status}) on attempt ${attempt}: ${errorText}`);
+                throw new Error(`Error generating page content: ${response.status} - ${response.statusText}`);
+              }
+
+              // Process the response
+              content = '';
+              const reader = response.body?.getReader();
+              const decoder = new TextDecoder();
+
+              if (!reader) {
+                throw new Error('Failed to get response reader');
+              }
+
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  content += decoder.decode(value, { stream: true });
+                }
+                // Ensure final decoding
+                content += decoder.decode();
+              } catch (readError) {
+                console.error('Error reading stream:', readError);
+                throw new Error('Error processing response stream');
+              }
             }
-            // Ensure final decoding
-            content += decoder.decode();
-          } catch (readError) {
-            console.error('Error reading stream:', readError);
-            throw new Error('Error processing response stream');
+
+            // If we reach here, the attempt was successful
+            console.log(`Successfully generated content for ${page.title} on attempt ${attempt}, length: ${content.length} characters`);
+            break; // Exit the retry loop on success
+
+          } catch (err) {
+            lastError = err instanceof Error ? err : new Error('Unknown error');
+            console.error(`Attempt ${attempt}/${MAX_RETRIES} failed for page ${page.id}:`, lastError.message);
+            
+            // If this is not the last attempt, wait a bit before retrying
+            if (attempt < MAX_RETRIES) {
+              const waitTime = attempt * 1000; // Progressive backoff: 1s, 2s, 3s
+              console.log(`Waiting ${waitTime}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
           }
+        }
+
+        // Check if all retries failed
+        if (!content && lastError) {
+          throw lastError;
         }
 
         // Clean up markdown delimiters
         content = content.replace(/^```markdown\s*/i, '').replace(/```\s*$/i, '');
-
-        console.log(`Received content for ${page.title}, length: ${content.length} characters`);
 
         // Store the FINAL generated content
         const updatedPage = { ...page, content };
@@ -542,14 +565,14 @@ Remember:
 
         resolve();
       } catch (err) {
-        console.error(`Error generating content for page ${page.id}:`, err);
+        console.error(`Error generating content for page ${page.id} after ${MAX_RETRIES} attempts:`, err);
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         // Update page state to show error
         setGeneratedPages(prev => ({
           ...prev,
-          [page.id]: { ...page, content: `Error generating content: ${errorMessage}` }
+          [page.id]: { ...page, content: `Error generating content after 3 retries: ${errorMessage}` }
         }));
-        setError(`Failed to generate content for ${page.title}.`);
+        setError(`Failed to generate content for ${page.title} after 3 retries.`);
         resolve(); // Resolve even on error to unblock queue
       } finally {
         // Clear the processing flag for this page
@@ -727,8 +750,14 @@ IMPORTANT:
 
         // Create a promise that resolves when the WebSocket connection is complete
         await new Promise<void>((resolve, reject) => {
+          // If the connection doesn't open within 5 seconds, fall back to HTTP
+          const timeout = setTimeout(() => {
+            reject(new Error('WebSocket connection timeout'));
+          }, 5000);
+
           // Set up event handlers
           ws.onopen = () => {
+            clearTimeout(timeout);
             console.log('WebSocket connection established for wiki structure');
             // Send the request as JSON
             ws.send(JSON.stringify(requestBody));
@@ -736,22 +765,9 @@ IMPORTANT:
           };
 
           ws.onerror = (error) => {
+            clearTimeout(timeout);
             console.error('WebSocket error:', error);
             reject(new Error('WebSocket connection failed'));
-          };
-
-          // If the connection doesn't open within 5 seconds, fall back to HTTP
-          const timeout = setTimeout(() => {
-            reject(new Error('WebSocket connection timeout'));
-          }, 5000);
-
-          // Clear the timeout if the connection opens successfully
-          ws.onopen = () => {
-            clearTimeout(timeout);
-            console.log('WebSocket connection established for wiki structure');
-            // Send the request as JSON
-            ws.send(JSON.stringify(requestBody));
-            resolve();
           };
         });
 
@@ -1776,7 +1792,7 @@ IMPORTANT:
                 </div>
                 <p className="text-xs text-[var(--muted)] text-center">
                   {language === 'ja'
-                    ? `${wikiStructure.pages.length}ページ中${wikiStructure.pages.length - pagesInProgress.size}ページ完了`
+                    ? `${wikiStructure.pages.length - pagesInProgress.size} of ${wikiStructure.pages.length} pages completed`
                     : messages.repoPage?.pagesCompleted
                         ? messages.repoPage.pagesCompleted
                             .replace('{completed}', (wikiStructure.pages.length - pagesInProgress.size).toString())
@@ -1784,26 +1800,30 @@ IMPORTANT:
                         : `${wikiStructure.pages.length - pagesInProgress.size} of ${wikiStructure.pages.length} pages completed`}
                 </p>
 
-                {/* Show list of in-progress pages */}
-                {pagesInProgress.size > 0 && (
-                  <div className="mt-4 text-xs">
-                    <p className="text-[var(--muted)] mb-2">
-                      {messages.repoPage?.currentlyProcessing || 'Currently processing:'}
+                {/* Show list of all pages with status */}
+                {wikiStructure.pages.length > 0 && (
+                  <div className="bg-[var(--background)]/30 rounded-xl border border-[var(--border-color)]/50">
+                    <p className="text-[var(--muted)] mb-4 text-lg font-medium">
+                      {messages.repoPage?.pageGenerationStatus || 'Page Generation Status:'}
                     </p>
-                    <ul className="text-[var(--foreground)] space-y-1">
-                      {Array.from(pagesInProgress).slice(0, 3).map(pageId => {
-                        const page = wikiStructure.pages.find(p => p.id === pageId);
-                        return page ? <li key={pageId} className="truncate border-l-2 border-[var(--accent-primary)]/30 pl-2">{page.title}</li> : null;
+                    <ul className="text-[var(--foreground)] space-y-2 overflow-y-auto text-xs">
+                      {wikiStructure.pages.map(page => {
+                        const isInProgress = pagesInProgress.has(page.id);
+                        const isCompleted = generatedPages[page.id] && generatedPages[page.id].content && generatedPages[page.id].content !== 'Loading...';
+                        
+                        return (
+                          <li key={page.id} className="flex items-center gap-3 border-l-2 border-[var(--accent-primary)]/30 pl-3 py-1">
+                            {isInProgress ? (
+                              <FaSpinner className="animate-spin text-[var(--accent-primary)] flex-shrink-0" />
+                            ) : isCompleted ? (
+                              <FaCheck className="text-green-500 flex-shrink-0" />
+                            ) : (
+                              <div className="w-3 h-3 border border-[var(--muted)] rounded-full flex-shrink-0" />
+                            )}
+                            <span className="truncate">{page.title}</span>
+                          </li>
+                        );
                       })}
-                      {pagesInProgress.size > 3 && (
-                        <li className="text-[var(--muted)]">
-                          {language === 'ja'
-                            ? `...他に${pagesInProgress.size - 3}ページ`
-                            : messages.repoPage?.andMorePages
-                                ? messages.repoPage.andMorePages.replace('{count}', (pagesInProgress.size - 3).toString())
-                                : `...and ${pagesInProgress.size - 3} more`}
-                        </li>
-                      )}
                     </ul>
                   </div>
                 )}
