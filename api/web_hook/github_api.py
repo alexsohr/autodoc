@@ -353,9 +353,6 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         logger.info(f"Number of sections: {len(sections)}")
         logger.info(f"Sections: {sections}")
 
-        # Generate wiki structure XML
-        wiki_structure_xml = WikiStructure
-
         # Mark all pages as in progress (simulate with a set)
         pages_in_progress = set(page['id'] for page in pages)
         logger.info(f"Starting generation for {len(pages)} pages sequentially")
@@ -370,22 +367,6 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
 
         logger.info(f"All pages processed. {generated_pages}")
 
-
-        # title, description, pages = parse_wiki_structure(wiki_structure_xml)
-        # logger.info(f"Parsed wiki structure: {len(pages)} pages")
-        # # Generate content for each page
-        # generated_pages = {}
-        # for page in pages:
-        #     content = await generate_page_content(page, owner, repo)
-        #     generated_pages[page['id']] = {
-        #         'id': page['id'],
-        #         'title': page['title'],
-        #         'content': content,
-        #         'file_paths': page['file_paths'],
-        #         'importance': page['importance'],
-        #         'related_pages': page['related_pages'],
-        #     }
-        # Compose result
         result = {
             'wiki_structure': {
                 'title': title,
@@ -564,9 +545,9 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         github_event = request.headers.get("X-GitHub-Event")
         logger.info(f"Received GitHub webhook event: {github_event}")
         logger.info(f"Request headers: {request.headers}")
-        # Log the event
-        action = payload.get("action", None)
-        logger.info(f"Received GitHub webhook event with action: {action}")
+
+        pull_request_event = GithubPushEvent(**payload)
+        logger.info(f"Received GitHub webhook event with action: {pull_request_event.action}")
         # Validate HMAC-SHA256 signature
         signature = request.headers.get("X-Hub-Signature")
         if not signature:
@@ -581,29 +562,32 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         #     logger.error("Invalid HMAC-SHA256 signature")
         #     raise HTTPException(status_code=403, detail="Invalid HMAC-SHA256 signature")
         # Check if this is a GitHub issue event
-        if action == "closed" and github_event == "push":
+
+        if github_event == "pull_request" and pull_request_event.action == "closed" and \
+            pull_request_event.pull_request.merged and \
+            pull_request_event.pull_request.base.ref == pull_request_event.repository.default_branch:
             try:
                 # Parse the issue event data
-                push_event = GithubPushEvent(**payload)
-                logger.info(f"Push event is {push_event}")
-                logger.info(f"Processing GitHub push event: {action} for push #{push_event.number}")
+                
+                logger.info(f"Push event is {pull_request_event}")
+                logger.info(f"Processing GitHub event: {pull_request_event.action} for push #{pull_request_event.number}")
 
                 # Add the background task for processing
                 background_tasks.add_task(
                     process_github_repository_async,
-                    github_event=push_event
+                    github_event=pull_request_event
                 )
-                logger.info(f"Background task added for processing repository: {push_event.repository.full_name}")
+                logger.info(f"Background task added for processing repository: {pull_request_event.repository.full_name}")
                 return JSONResponse(
                     status_code=202,
-                    content={"message": f"Webhook received. Processing repository {push_event.repository.full_name} in background."}
+                    content={"message": f"Webhook received. Processing repository {pull_request_event.repository.full_name} in background."}
                 )
             except Exception as e:
                 logger.error(f"Error parsing GitHub issue event: {str(e)}", exc_info=True)
                 raise HTTPException(status_code=400, detail=f"Invalid issue event format: {str(e)}")
         else:
             # For other event types, just acknowledge receipt
-            logger.info(f"Received unsupported GitHub event with action: {action}")
+            logger.info(f"Received unsupported GitHub event with action: {pull_request_event}")
             return JSONResponse(
                 status_code=202,
                 content={"message": "Webhook received, but event type is not supported for processing."}

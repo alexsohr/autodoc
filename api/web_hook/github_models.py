@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any
 
 
 
@@ -32,6 +32,14 @@ class Repository(BaseModel):
     html_url: str
     default_branch: str
 
+class Base(BaseModel):
+    ref: str
+
+class PullRequest(BaseModel):
+    # raw_value: str = Field(..., alias='merged')
+    merged: bool
+    base: Base
+
 
 class GithubPushEvent(BaseModel):
     """
@@ -47,9 +55,11 @@ class GithubPushEvent(BaseModel):
     action: str
     repository: Repository
     number: int
+    pull_request: PullRequest
     
     class Config:
         extra = "ignore"
+    
 
 class WikiStructure:
     def __init__(
