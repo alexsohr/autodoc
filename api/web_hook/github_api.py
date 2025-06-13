@@ -174,7 +174,7 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         # WebSocket URL (assuming the server is running on localhost:8001)
         ws_url = "ws://localhost:8001/ws/chat"
 
-        ai_response = ""
+        wiki_structure_response = ""
 
         try:
             # Connect to WebSocket and get response
@@ -187,27 +187,30 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
 
                 # Collect all response chunks
                 async for message in websocket:
-                    ai_response += message
+                    wiki_structure_response += message
                     logger.debug(f"Received chunk: {len(message)} characters")
 
-                logger.info(f"WebSocket response complete. Total length: {len(ai_response)}")
+                logger.info(f"WebSocket response complete. Total length: {len(wiki_structure_response)}")
 
         except Exception as e:
             logger.error(f"WebSocket connection failed: {e}")
 
-        logger.info(f"Wiki structure response length: {len(ai_response)}")
+        logger.info(f"Wiki structure response length: {len(wiki_structure_response)}")
 
         # Check if response is empty
-        if not ai_response or ai_response.strip() == "":
+        if not wiki_structure_response or wiki_structure_response.strip() == "":
             logger.error("Wiki structure response is empty - this indicates an issue with the model call")
             raise ValueError("Wiki structure response is empty")
 
-        # Process the response
-        wiki_structure_xml = await process_wiki_structure_response(ai_response)
+        # Clean up the response to extract XML (ensure wiki_structure_response is string)
+        wiki_structure_response = str(wiki_structure_response)
+        wiki_structure_response = re.sub(r'^```(?:xml)?\s*', '', wiki_structure_response, flags=re.IGNORECASE)
+        wiki_structure_response = re.sub(r'```\s*$', '', wiki_structure_response, flags=re.IGNORECASE)
+        match = re.search(r"<wiki_structure>[\s\S]*?</wiki_structure>", wiki_structure_response, re.MULTILINE)
 
         if not match:
-            logger.error(f"No valid XML structure found in AI response. Response length: {len(ai_response)}")
-            logger.error(f"First 500 chars of response: {ai_response[:500]}")
+            logger.error(f"No valid XML structure found in AI response. Response length: {len(wiki_structure_response)}")
+            logger.error(f"First 500 chars of response: {wiki_structure_response[:500]}")
             raise ValueError("No valid XML structure found in AI response")
 
         xmlMatch = match.group(0)
