@@ -1,4 +1,7 @@
-def parse_wiki_pages_from_xml(pages_els):
+from typing import List, Dict
+
+
+def parse_wiki_pages_from_xml(pages_els) -> List[Dict]:
     """
     Parse <page> elements from XML and return a list of page dicts.
     """

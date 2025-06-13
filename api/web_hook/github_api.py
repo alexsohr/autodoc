@@ -12,7 +12,11 @@ from fastapi import HTTPException, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from api.web_hook.github_models import GithubPushEvent
 from fastapi import FastAPI
+import websockets
 from fastapi.middleware.cors import CORSMiddleware
+from api.web_hook.github_models import WikiStructure
+from api.web_hook.github_prompts import generate_wiki_page_prompt
+import asyncio
 
 # Import the FastAPI app instance
 from api.web_hook.github_prompts import generate_wiki_structure_prompt
@@ -130,20 +134,123 @@ def parse_wiki_structure(xml_text: str) -> Tuple[str, str, List[dict]]:
         }
         pages.append(page)
     return title, description, pages
- 
 
-async def generate_page_content(page: dict, owner: str, repo: str) -> str:
-    """
-    Generate content for a wiki page (stub/LLM call).
-    Parameters:
-        page (dict): Page info
-        owner (str): Repository owner
-        repo (str): Repository name
-    Returns:
-        str: Markdown content for the page
-    """
-    # Simulate content generation
-    return f"# {page['title']}\n\nThis is the auto-generated content for {page['title']} in {owner}/{repo}.\n\nSources: {', '.join(page['file_paths'])}"
+MAX_RETRIES = 3
+
+async def generate_page_content(
+    page: Dict,
+    owner: str,
+    repo: str,
+    repo_url: str, # Object/Dictionary with owner, repo, type, etc.
+    generated_pages = {}, # Dictionary to hold generated content
+) -> Dict:
+    page_id = page['id']
+    page_title = page['title']
+    file_paths = page['filePaths']
+
+    try:
+        # --- Input Validation ---
+        if not owner or not repo:
+            raise ValueError('Invalid repository information. Owner and repo name are required.')
+
+        # Update generated_pages with a placeholder
+        generated_pages[page_id] = {**page, 'content': 'Loading...'}
+
+        # --- Prompt Construction ---
+        # This part translates directly using Python f-strings or .format()
+        file_list_markdown = '\n'.join([f"- [{path}]({path})" for path in file_paths])
+        prompt_content = generate_wiki_page_prompt(page_title, file_list_markdown, file_paths)
+
+        # --- Prepare Request Body ---
+        request_body = {
+            'repo_url': repo_url,
+            'type': 'github',
+            'messages': [{
+                'role': 'user',
+                'content': prompt_content
+            }],
+            'language': 'English'
+        }
+
+        content = ''
+        last_error = None
+
+        # --- Retry Logic ---
+        for attempt in range(1, MAX_RETRIES + 1):
+            logger.info(f"Attempt {attempt}/{MAX_RETRIES} for page: {page_title}")
+            content = '' # Reset content for each attempt
+
+            try:
+                # --- WebSocket Attempt ---
+                # Need to determine the server base URL in Python context
+                server_base_url = 'http://localhost:8001' # Example
+                ws_base_url = server_base_url.replace('http', 'ws')
+                ws_url = f"{ws_base_url}/ws/chat"
+
+                try:
+                    async with websockets.connect(ws_url) as websocket:
+                        logger.info(f"WebSocket connection established for page: {page_title} (attempt {attempt})")
+                        await websocket.send(json.dumps(request_body))
+
+                        # Receive messages
+                        # Collect all response chunks
+                        async for message in websocket:
+                            try:
+                                content += message
+                            except asyncio.TimeoutError:
+                                logger.warning(f"WebSocket read timeout for page: {page_title}")
+                                break
+                            except Exception as e:
+                                logger.error(f"WebSocket receive error for page {page_title}: {e}")
+                                raise e # Re-raise to trigger fallback
+
+                        logger.info(f"WebSocket response complete. Total length: {len(content)}")
+                    logger.info(f"WebSocket connection closed for page: {page_title} (attempt {attempt})")
+                    # If we reach here, WebSocket was successful (at least connection and initial send)
+                    # The content variable holds the received data.
+                    if content: # Check if any content was received
+                         logger.info(f"Successfully generated content for {page_title} via WebSocket on attempt {attempt}, length: {len(content)} characters")
+                         break # Exit retry loop on success
+
+                except Exception as ws_error:
+                    logger.error(f"WebSocket error on attempt {attempt}, falling back to HTTP: {ws_error}")
+
+            except Exception as err:
+                last_error = err
+                logger.error(f"Attempt {attempt}/{MAX_RETRIES} failed for page {page_id}: {err}")
+
+                # If this is not the last attempt, wait
+                if attempt < MAX_RETRIES:
+                    wait_time = attempt * 1 # Progressive backoff: 1s, 2s, 3s
+                    logger.info(f"Waiting {wait_time}s before retry...")
+                    await asyncio.sleep(wait_time)
+
+        # --- Check if all retries failed ---
+        if not content and last_error:
+            raise last_error
+
+        # --- Clean up markdown delimiters ---
+        content = content.strip() # Remove leading/trailing whitespace
+        if content.lower().startswith('```markdown'):
+             content = content[len('```markdown'):].lstrip()
+        if content.lower().endswith('```'):
+             content = content[:-len('```')].rstrip()
+
+
+        # --- Store the FINAL generated content (Simulated) ---
+        updated_page = {**page, 'content': content}
+        generated_pages[page_id] = updated_page
+        return generated_pages
+
+    except Exception as err:
+        logger.error(f"Error generating content for page {page_id} after {MAX_RETRIES} attempts: {err}")
+        error_message = str(err) if isinstance(err, Exception) else 'Unknown error'
+        # Update page state to show error (Simulated)
+        generated_pages[page_id] = {**page, 'content': f"Error generating content after {MAX_RETRIES} retries: {error_message}"}
+        # Set global error state (Simulated)
+        # set_error(f"Failed to generate content for {page_title} after {MAX_RETRIES} retries.")
+        # Resolve even on error to unblock queue (Simulated)
+        # This might involve signaling completion for this specific page task.
  
 
 async def process_github_repository_async(github_event: GithubPushEvent, actor_name: str = None):
@@ -179,8 +286,7 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         # Use the generate_github_wiki_structure_prompt function to generate the request body
         repo_url = f"https://github.org/{owner}/{repo}"
         # Prepare request body for wiki structure generation
-        # Create WebSocket connection to get AI response (like the frontend does)
-        import websockets
+        
 
         # Create request body for WebSocket
         request_body = {
@@ -248,23 +354,37 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         logger.info(f"Sections: {sections}")
 
         # Generate wiki structure XML
-        wiki_structure_xml = await generate_wiki_structure(owner, repo, file_tree, readme_content)
-        logger.info(f"Wiki structure XML generated for {owner}/{repo}")
-        # Parse wiki structure
-        title, description, pages = parse_wiki_structure(wiki_structure_xml)
-        logger.info(f"Parsed wiki structure: {len(pages)} pages")
-        # Generate content for each page
+        wiki_structure_xml = WikiStructure
+
+        # Mark all pages as in progress (simulate with a set)
+        pages_in_progress = set(page['id'] for page in pages)
+        logger.info(f"Starting generation for {len(pages)} pages sequentially")
         generated_pages = {}
+
         for page in pages:
-            content = await generate_page_content(page, owner, repo)
-            generated_pages[page['id']] = {
-                'id': page['id'],
-                'title': page['title'],
-                'content': content,
-                'file_paths': page['file_paths'],
-                'importance': page['importance'],
-                'related_pages': page['related_pages'],
-            }
+            try:
+                generated_pages = await generate_page_content(page=page, owner=owner, repo=repo, repo_url=repo_url, 
+                    generated_pages=generated_pages)
+            finally:
+                pages_in_progress.discard(page['id'])
+
+        logger.info(f"All pages processed. {generated_pages}")
+
+
+        # title, description, pages = parse_wiki_structure(wiki_structure_xml)
+        # logger.info(f"Parsed wiki structure: {len(pages)} pages")
+        # # Generate content for each page
+        # generated_pages = {}
+        # for page in pages:
+        #     content = await generate_page_content(page, owner, repo)
+        #     generated_pages[page['id']] = {
+        #         'id': page['id'],
+        #         'title': page['title'],
+        #         'content': content,
+        #         'file_paths': page['file_paths'],
+        #         'importance': page['importance'],
+        #         'related_pages': page['related_pages'],
+        #     }
         # Compose result
         result = {
             'wiki_structure': {
@@ -272,7 +392,7 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
                 'description': description,
                 'pages': pages
             },
-            'generated_pages': generated_pages,
+            'generated_pages': "generated_pages",
             'repo_url': repo_url
         }
         logger.info(f"Wiki generation complete for {owner}/{repo}")
