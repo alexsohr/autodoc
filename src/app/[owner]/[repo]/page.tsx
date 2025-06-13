@@ -937,6 +937,10 @@ IMPORTANT:
             }
           });
         }
+
+        console.log("Root sections:", rootSections);
+        console.log("Sections:", sections);
+        
       }
 
       // Create wiki structure

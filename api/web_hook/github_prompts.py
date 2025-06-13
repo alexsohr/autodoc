@@ -1,4 +1,3 @@
-
 import logging
 
 # Configure logger
@@ -105,33 +104,3 @@ IMPORTANT:
 2. Each page should focus on a specific aspect of the codebase (e.g., architecture, key features, setup)
 3. The relevant_files should be actual files from the repository that would be used to generate that page
 4. Return ONLY valid XML with the structure specified above, with no markdown code block delimiters"""
-
-async def process_wiki_structure_response(wiki_structure_xml: str) -> str:
-    """
-    Process the response from the wiki structure generation request.
-
-    Parameters:
-        wiki_structure_xml (str): The raw XML response containing the wiki structure
-
-    Returns:
-        str: The cleaned and extracted wiki structure XML
-
-    Raises:
-        ValueError: If no valid XML structure is found in the response
-    """
-    import re
-
-    # Clean up markdown delimiters if any
-    wiki_structure_xml = wiki_structure_xml.replace("```xml", "").replace("```", "").strip()
-
-    # Extract wiki structure from response
-    xml_match = re.search(r"<wiki_structure>[\s\S]*?<\/wiki_structure>", wiki_structure_xml)
-    if not xml_match:
-        logger.error("No valid XML found in response")
-        raise ValueError("No valid XML found in response")
-
-    wiki_structure = xml_match.group(0)
-    logger.info(f"Extracted wiki structure XML of length: {len(wiki_structure)}")
-
-    return wiki_structure
-

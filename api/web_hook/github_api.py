@@ -19,6 +19,7 @@ from api.web_hook.github_prompts import generate_wiki_structure_prompt
 
 from dotenv import load_dotenv
 from api.data_pipeline import DatabaseManager
+from api.web_hook.github_api_herlpers import parse_wiki_pages_from_xml
 
 load_dotenv()
 
@@ -39,6 +40,31 @@ app.add_middleware(
 
 # Configure logger
 logger = logging.getLogger(__name__)
+
+def extract_wiki_structure_xml(wiki_structure_response, logger=None):
+    """
+    Clean up the AI response and extract the <wiki_structure>...</wiki_structure> XML block.
+    Raises ValueError if the response is empty or no valid XML is found.
+    """
+    if not wiki_structure_response or str(wiki_structure_response).strip() == "":
+        if logger:
+            logger.error("Wiki structure response is empty - this indicates an issue with the model call")
+        raise ValueError("Wiki structure response is empty")
+
+    wiki_structure_response = str(wiki_structure_response)
+    wiki_structure_response = re.sub(r'^```(?:xml)?\s*', '', wiki_structure_response, flags=re.IGNORECASE)
+    wiki_structure_response = re.sub(r'```\s*$', '', wiki_structure_response, flags=re.IGNORECASE)
+    match = re.search(r"<wiki_structure>[\s\S]*?</wiki_structure>", wiki_structure_response, re.MULTILINE)
+
+    if not match:
+        if logger:
+            logger.error(f"No valid XML structure found in AI response. Response length: {len(wiki_structure_response)}")
+            logger.error(f"First 500 chars of response: {wiki_structure_response[:500]}")
+        raise ValueError("No valid XML structure found in AI response")
+
+    xmlMatch = match.group(0)
+    xmlText = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', xmlMatch)
+    return xmlText
 
 async def generate_wiki_structure(owner: str, repo: str, file_tree: str, readme: str) -> str:
     """
@@ -196,29 +222,12 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
             logger.error(f"WebSocket connection failed: {e}")
 
         logger.info(f"Wiki structure response length: {len(wiki_structure_response)}")
+        logger.info(f"Wiki structure response: {wiki_structure_response}")
 
-        # Check if response is empty
-        if not wiki_structure_response or wiki_structure_response.strip() == "":
-            logger.error("Wiki structure response is empty - this indicates an issue with the model call")
-            raise ValueError("Wiki structure response is empty")
 
-        # Clean up the response to extract XML (ensure wiki_structure_response is string)
-        wiki_structure_response = str(wiki_structure_response)
-        wiki_structure_response = re.sub(r'^```(?:xml)?\s*', '', wiki_structure_response, flags=re.IGNORECASE)
-        wiki_structure_response = re.sub(r'```\s*$', '', wiki_structure_response, flags=re.IGNORECASE)
-        match = re.search(r"<wiki_structure>[\s\S]*?</wiki_structure>", wiki_structure_response, re.MULTILINE)
-
-        if not match:
-            logger.error(f"No valid XML structure found in AI response. Response length: {len(wiki_structure_response)}")
-            logger.error(f"First 500 chars of response: {wiki_structure_response[:500]}")
-            raise ValueError("No valid XML structure found in AI response")
-
-        xmlMatch = match.group(0)
-        xmlText = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', xmlMatch)
-        logger.info(f"Successfully extracted XML structure with length: {len(xmlText)}")
-        logger.info(f"First 200 chars of XML: {xmlText[:200]}")
+        # Extract the XML structure from the response
+        xmlText = extract_wiki_structure_xml(wiki_structure_response, logger=logger)
         
-        # xml_text is your XML string
         root = ET.fromstring(xmlText)
         title_el = root.find('title')
         description_el = root.find('description')
@@ -227,33 +236,10 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         description = description_el.text if description_el is not None else ''
         logger.info(f"The number of pages are {len(pages_els)}")
 
-        pages = []
         # TODO: Add retry ability
-        for page_el in pages_els:
-            id_ = page_el.get('id', f'page-{len(pages) + 1}')
-            title_el = page_el.find('title')
-            importance_el = page_el.find('importance')
-            file_path_els = page_el.findall('.//file_path')
-            related_els = page_el.findall('.//related')
-            title = title_el.text if title_el is not None else ''
-            importance = 'medium'
-            if importance_el is not None:
-                if importance_el.text == 'high':
-                    importance = 'high'
-                elif importance_el.text == 'medium':
-                    importance = 'medium'
-                else:
-                    importance = 'low'
-            file_paths = [el.text for el in file_path_els if el.text]
-            related_pages = [el.text for el in related_els if el.text]
-            pages.append({
-                'id': id_,
-                'title': title,
-                'content': '',  # Will be generated later
-                'filePaths': file_paths,
-                'importance': importance,
-                'relatedPages': related_pages
-            })
+        pages = parse_wiki_pages_from_xml(pages_els)
+        logger.info(f"Number of pages: {len(pages)}")
+        
         sections = []
         root_sections = []
         sections_els = root.findall('.//section')
@@ -261,8 +247,8 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
             for section_el in sections_els:
                 id_ = section_el.get('id', f'section-{len(sections) + 1}')
                 title_el = section_el.find('title')
-                page_ref_els = section_el.findall('page_ref')
-                section_ref_els = section_el.findall('section_ref')
+                page_ref_els = section_el.findall('.//page_ref')
+                section_ref_els = section_el.findall('.//section_ref')
                 title = title_el.text if title_el is not None else ''
                 pages = [el.text for el in page_ref_els if el.text]
                 subsections = [el.text for el in section_ref_els if el.text]
@@ -276,12 +262,17 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
                 # Check if this is a root section (not referenced by any other section)
                 is_referenced = False
                 for other_section in sections_els:
-                    other_section_refs = other_section.findall('section_ref')
+                    other_section_refs = other_section.findall('.//section_ref')
                     for ref in other_section_refs:
                         if ref.text == id_:
                             is_referenced = True
                 if not is_referenced:
                     root_sections.append(id_)
+        logger.info(f"Number of root sections: {len(root_sections)}")
+        logger.info(f"Root sections: {root_sections}")
+        logger.info(f"Number of sections: {len(sections)}")
+        logger.info(f"Sections: {sections}")
+
         # Generate wiki structure XML
         wiki_structure_xml = await generate_wiki_structure(owner, repo, file_tree, readme_content)
         logger.info(f"Wiki structure XML generated for {owner}/{repo}")
