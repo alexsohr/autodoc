@@ -19,21 +19,17 @@ class TestGitHubAPI(unittest.TestCase):
         """
         self.test_client = TestClient(app)
         self.raw_json = {
-            "action": "closed",
             "number": 1,
-            "repository" : {
-                "id": 1296269,
-                "full_name": "octocat/Hello-World",
+            "action": "closed",
+            "repository": {
+                "id": 1001069502,
+                "full_name": "Taha-1005/webhook_autodoc",
+                "private": false,
                 "owner": {
-                "login": "octocat",
-                "id": 1,
+                    "login": "Taha-1005",
+                    "id": 82571791
                 },
-                "html_url": "https://github.com/octocat/Hello-World",
-                "private": False,
-            },
-            "sender": {
-                "login": "octocat",
-                "id": 1,
+                "html_url": "https://github.com/Taha-1005/webhook_autodoc"
             }
         }
         self.headers_mock = {

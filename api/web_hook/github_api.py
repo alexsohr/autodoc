@@ -368,7 +368,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         logger.info(f"Received GitHub webhook event: {github_event}")
         logger.info(f"Request headers: {request.headers}")
         # Log the event
-        action = payload.get("action")
+        action = payload.get("action", None)
         logger.info(f"Received GitHub webhook event with action: {action}")
         # Validate HMAC-SHA256 signature
         signature = request.headers.get("X-Hub-Signature")

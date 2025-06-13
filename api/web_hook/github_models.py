@@ -29,20 +29,6 @@ class Repository(BaseModel):
     owner: Owner
     html_url: str
 
-
-class Sender(BaseModel):
-    """
-    Model representing the user who triggered the event.
-    Parameters:
-        login (str): The username of the sender
-        id (int): The unique ID of the sender
-    Returns:
-        This class does not return anything
-    """
-    login: str
-    id: int
-
-
 class GithubPushEvent(BaseModel):
     """
     Model for GitHub push event webhook payload.
@@ -56,7 +42,6 @@ class GithubPushEvent(BaseModel):
     """
     action: str
     repository: Repository
-    sender: Sender
     number: int
     
     class Config:
