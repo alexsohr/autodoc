@@ -1806,7 +1806,7 @@ IMPORTANT:
                 </div>
                 <p className="text-xs text-[var(--muted)] text-center">
                   {language === 'ja'
-                    ? `${wikiStructure.pages.length}ページ中${wikiStructure.pages.length - pagesInProgress.size}ページ完了`
+                    ? `${wikiStructure.pages.length - pagesInProgress.size} of ${wikiStructure.pages.length} pages completed`
                     : messages.repoPage?.pagesCompleted
                         ? messages.repoPage.pagesCompleted
                             .replace('{completed}', (wikiStructure.pages.length - pagesInProgress.size).toString())
@@ -1816,17 +1816,17 @@ IMPORTANT:
 
                 {/* Show list of all pages with status */}
                 {wikiStructure.pages.length > 0 && (
-                  <div className="mt-4 text-xs">
-                    <p className="text-[var(--muted)] mb-2">
+                  <div className="bg-[var(--background)]/30 rounded-xl border border-[var(--border-color)]/50">
+                    <p className="text-[var(--muted)] mb-4 text-lg font-medium">
                       {messages.repoPage?.pageGenerationStatus || 'Page Generation Status:'}
                     </p>
-                    <ul className="text-[var(--foreground)] space-y-1 max-h-48 overflow-y-auto">
+                    <ul className="text-[var(--foreground)] space-y-2 overflow-y-auto text-xs">
                       {wikiStructure.pages.map(page => {
                         const isInProgress = pagesInProgress.has(page.id);
                         const isCompleted = generatedPages[page.id] && generatedPages[page.id].content && generatedPages[page.id].content !== 'Loading...';
                         
                         return (
-                          <li key={page.id} className="flex items-center gap-2 border-l-2 border-[var(--accent-primary)]/30 pl-2">
+                          <li key={page.id} className="flex items-center gap-3 border-l-2 border-[var(--accent-primary)]/30 pl-3 py-1">
                             {isInProgress ? (
                               <FaSpinner className="animate-spin text-[var(--accent-primary)] flex-shrink-0" />
                             ) : isCompleted ? (
