@@ -309,7 +309,7 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen paper-texture p-4 md:p-8 flex flex-col">
+    <div className="h-screen p-4 md:p-8 flex flex-col">
       <header className="max-w-6xl mx-auto mb-6 h-fit w-full">
         <div
           className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-[var(--card-bg)] rounded-lg shadow-custom border border-[var(--border-color)] p-4">

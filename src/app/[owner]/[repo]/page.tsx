@@ -1750,7 +1750,7 @@ IMPORTANT:
   const [isModelSelectionModalOpen, setIsModelSelectionModalOpen] = useState(false);
 
   return (
-    <div className="h-screen paper-texture p-4 md:p-8 flex flex-col">
+    <div className="h-screen p-4 md:p-8 flex flex-col">
       <style>{wikiStyles}</style>
 
       <header className="max-w-[90%] xl:max-w-[1400px] mx-auto mb-8 h-fit w-full">
