@@ -3,7 +3,11 @@ import asyncio
 import websockets
 import json
 import logging
+import os
+from dotenv import load_dotenv
 from api.web_hook.github_prompts import generate_wiki_page_prompt
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +83,7 @@ async def generate_page_content(
     owner: str,
     repo: str,
     repo_url: str, # Object/Dictionary with owner, repo, type, etc.
-    generated_pages = {}, # Dictionary to hold generated content
+    generated_pages: Dict | None = None, # Dictionary to hold generated content
 ) -> Dict:
     page_id = page['id']
     page_title = page['title']
@@ -123,7 +127,7 @@ async def generate_page_content(
                 # --- WebSocket Attempt ---
                 server_base_url = 'http://localhost:8001' # Example
                 ws_base_url = server_base_url.replace('http', 'ws')
-                ws_url = f"{ws_base_url}/ws/chat"
+                ws_url = os.getenv("WS_API")
 
                 try:
                     async with websockets.connect(ws_url) as websocket:

@@ -102,7 +102,7 @@ async def export_wiki_python(
     repo: str,
     repo_url: str,
     export_format: str = 'json',  # 'markdown' or 'json'
-    api_base_url: str = "http://localhost:8001" # Base URL for your API
+    api_base_url: str = os.environ.get("API_BASE_URL", "http://localhost:8001") # Base URL for your API
 ) -> tuple[str | None, str | None]:
     """
     Exports the wiki content by calling an API and saving the result.
@@ -318,7 +318,7 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         }
 
         # WebSocket URL (assuming the server is running on localhost:8001)
-        ws_url = "ws://localhost:8001/ws/chat"
+        ws_url = os.getenv("WS_API")
 
         wiki_structure_response = ""
 
@@ -534,28 +534,6 @@ async def get_repo_readme(owner: str, repo: str) -> str:
     except Exception as e:
         logger.error(f"Error getting README for {owner}/{repo}: {str(e)}", exc_info=True)
         return ""
- 
-
-def clone_repo(self, params=None, method='GET', data=None, endpoint=''):
-    """
-    Make a request to the Github API.
-    Args:
-        params (dict, optional): Query parameters for the request
-        method (str): HTTP method ('GET' or 'POST')
-        data (dict, optional): Data to send in the request body (for POST requests)
-        endpoint (str): API endpoint to call (e.g., 'repositories/{owner}/{repo}/src')
-    Returns:
-        dict: JSON response from the Github API
-    Raises:
-        HTTPError: If the request fails
-    """
-    url = f"https://github.org/{endpoint}"
-    if method == 'GET':
-        response = requests.get(url, auth=(self.inputs.sid, self.inputs.password), params=params)
-    elif method == 'POST':
-        response = requests.post(url, auth=(self.inputs.sid, self.inputs.password), json=data)
-    response.raise_for_status()
-    return response.json()
  
 
 @app.post("/webhook")
