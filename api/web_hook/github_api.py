@@ -363,10 +363,10 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     try:
         # Parse the webhook payload
         payload = await request.json()
-        headers = request.headers
         # Extract GitHub event type from headers
         github_event = request.headers.get("X-GitHub-Event")
         logger.info(f"Received GitHub webhook event: {github_event}")
+        logger.info(f"Request headers: {request.headers}")
         # Log the event
         action = payload.get("action")
         logger.info(f"Received GitHub webhook event with action: {action}")
