@@ -162,11 +162,11 @@ The config.yml file uses YAML, a popular data format chosen for its human-readab
                     "--with", "fastmcp>=2.8.0",
                     "--with", "httpx>=0.28.0",
                     "python",
-                    "/mnt/e/projects/autodoc/autodoc/mcp/mcp-server.py"
+                    "<ABSOLUTE_PATH_TO_AUTODOC_MCP_SERVER>/mcp-server.py"
                 ],
                 "env": {
-                    "AUTODOC_SERVER_URL": "http://localhost:3000",
-                    "REPO_URL": "https://github.com/alexsohr/autodoc",
+                    "AUTODOC_SERVER_URL": "<AUTODOC_SERVER_URL>",
+                    "REPO_URL": "<TARGET_REPOSITORY_URL>",
                     "MCP_REQUEST_TIMEOUT": "30.0",
                     "DEBUG": "true"
                 }
@@ -174,9 +174,10 @@ The config.yml file uses YAML, a popular data format chosen for its human-readab
         }
     }
     ```
-3. 
-4. **Add "Copy to Clipboard" Button:**
-    * Include a button that allows the user to easily copy the entire JSON configuration block to their clipboard, providing immediate utility and a smooth user journey.
+
+3. **Add "A modal box with MCP instructions from mcp/README.md and add to Clipboard" Button on top of each mcp configuration:**
+    * Include a button that allows the user to open a modal box to see the specific repository mcp documentation and easily copy the entire JSON configuration block to their clipboard, providing immediate utility and a smooth user journey. 
+    * ABSOLUTE_PATH_TO_AUTODOC_MCP_SERVER, AUTODOC_SERVER_URL and TARGET_REPOSITORY_URL should be automatically filled in based on the selected repository.
 
 
 ### Feature 6: llms.txt Generation
