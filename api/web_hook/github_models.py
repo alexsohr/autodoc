@@ -1,4 +1,6 @@
 from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+
 
 
 class Owner(BaseModel):
@@ -48,3 +50,30 @@ class GithubPushEvent(BaseModel):
     
     class Config:
         extra = "ignore"
+
+class WikiStructure:
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        description: str,
+        pages: List[Dict[str, Any]],
+        sections: List[Dict[str, Any]],
+        root_sections: List[str]
+    ):
+        self.id = id
+        self.title = title
+        self.description = description
+        self.pages = pages
+        self.sections = sections
+        self.rootSections = root_sections
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "pages": self.pages,
+            "sections": self.sections,
+            "rootSections": self.rootSections
+        }

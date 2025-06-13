@@ -19,7 +19,7 @@ from api.web_hook.github_prompts import generate_wiki_structure_prompt
 
 from dotenv import load_dotenv
 from api.data_pipeline import DatabaseManager
-from api.web_hook.github_api_herlpers import parse_wiki_pages_from_xml
+from api.web_hook.github_api_herlpers import parse_wiki_pages_from_xml, parse_wiki_sections_from_xml
 
 load_dotenv()
 
@@ -240,34 +240,8 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         pages = parse_wiki_pages_from_xml(pages_els)
         logger.info(f"Number of pages: {len(pages)}")
         
-        sections = []
-        root_sections = []
         sections_els = root.findall('.//section')
-        if sections_els:
-            for section_el in sections_els:
-                id_ = section_el.get('id', f'section-{len(sections) + 1}')
-                title_el = section_el.find('title')
-                page_ref_els = section_el.findall('.//page_ref')
-                section_ref_els = section_el.findall('.//section_ref')
-                title = title_el.text if title_el is not None else ''
-                pages = [el.text for el in page_ref_els if el.text]
-                subsections = [el.text for el in section_ref_els if el.text]
-                section = {
-                    'id': id_,
-                    'title': title,
-                    'pages': pages,
-                    'subsections': subsections if subsections else None
-                }
-                sections.append(section)
-                # Check if this is a root section (not referenced by any other section)
-                is_referenced = False
-                for other_section in sections_els:
-                    other_section_refs = other_section.findall('.//section_ref')
-                    for ref in other_section_refs:
-                        if ref.text == id_:
-                            is_referenced = True
-                if not is_referenced:
-                    root_sections.append(id_)
+        sections, root_sections = parse_wiki_sections_from_xml(sections_els)
         logger.info(f"Number of root sections: {len(root_sections)}")
         logger.info(f"Root sections: {root_sections}")
         logger.info(f"Number of sections: {len(sections)}")
