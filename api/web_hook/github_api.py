@@ -180,6 +180,7 @@ async def export_wiki_python(
                 **page,  # Spread operator equivalent
                 'content': content
             })
+        logger.info(f"Pages to export: {pages_to_export}")
 
         # Prepare API request payload
         payload = {
@@ -242,6 +243,67 @@ async def export_wiki_python(
         # is_exporting = False
         # loading_message = None
         print("Export process finished.")
+
+def clean_and_format_content(content):
+    """
+    Cleans up HTML tags and source links from the content,
+    and removes specific patterns like mermaid diagrams and details tags.
+    """
+    # Remove <details> and <summary> tags and their content
+    content = re.sub(r'<details>.*?</details>', '', content, flags=re.DOTALL)
+    
+    # Remove `Sources: [...]()` or `Source: [...]()`
+    content = re.sub(r'`Sources: \[.*?\]\(\)`', '', content)
+    content = re.sub(r'Source: \[.*?\]\(\)', '', content)
+    
+    # Remove markdown image links [text](url)
+    content = re.sub(r'!\[.*?\]\(.*?\)', '', content)
+    
+    # Remove markdown links [text](url)
+    content = re.sub(r'\[(.*?)\]\(https?://[^\s)]+\)', r'\1', content)
+    
+    # Remove any remaining HTML tags
+    content = re.sub(r'<[^>]*>', '', content)
+
+    # Remove mermaid diagrams
+    content = re.sub(r'```mermaid.*?```', '', content, flags=re.DOTALL)
+    
+    # Remove code blocks that start with `tsx` or `python` if not meant to be kept as code
+    # For this specific case, the prompt implies these are code examples, so we will keep them formatted as code.
+    # If the goal was to remove all code, the following would be used:
+    # content = re.sub(r'```[a-zA-Z]*\n.*?```', '', content, flags=re.DOTALL)
+
+    # Clean up multiple blank lines
+    content = re.sub(r'\n\s*\n', '\n\n', content).strip()
+    return content
+
+def generate_llms_txt(data, filename="llms.txt"):
+    """
+    Converts the dictionary data into a good-looking text file.
+    Each page is formatted with its title, content, importance, related pages, and file paths.
+    """
+    with open(filename, "w", encoding="utf-8") as f:
+        for key, page_data in data.items():
+            title = page_data.get('title', key.replace('-', ' ').title())
+            content = page_data.get('content', '')
+            importance = page_data.get('importance', 'N/A')
+            related_pages = ", ".join(page_data.get('relatedPages', [])) if page_data.get('relatedPages') else 'None'
+            file_paths = ", ".join(page_data.get('filePaths', [])) if page_data.get('filePaths') else 'None'
+
+            # Clean and format the content
+            cleaned_content = clean_and_format_content(content)
+
+            f.write(f"# {title}\n")
+            f.write("-" * len(title) + "\n\n") # Underline the title for emphasis
+
+            f.write(f"**ID:** {page_data.get('id', 'N/A')}\n")
+            f.write(f"**Importance:** {importance.capitalize()}\n")
+            f.write(f"**Related Pages:** {related_pages}\n")
+            f.write(f"**Relevant Files:** {file_paths}\n\n")
+
+            f.write("## Content\n")
+            f.write(cleaned_content + "\n\n")
+            f.write("---" * 10 + "\n\n") # Separator between pages
 
 
 async def process_github_repository_async(github_event: GithubPushEvent, actor_name: str = None):
@@ -369,16 +431,22 @@ async def process_github_repository_async(github_event: GithubPushEvent, actor_n
         }
         logger.info(f"Wiki generation complete for {owner}/{repo}")
 
-        wiki_structure = WikiStructure(
-            id='wiki',
-            title=title,
-            description=description,
-            pages=pages,
-            sections=sections,
-            root_sections=root_sections
-        )
+        
 
-        await export_wiki_python(wiki_structure, generated_pages, repo, repo_url)
+        # wiki_structure = WikiStructure(
+        #     id='wiki',
+        #     title=title,
+        #     description=description,
+        #     pages=pages,
+        #     sections=sections,
+        #     root_sections=root_sections
+        # )
+
+        # await export_wiki_python(wiki_structure, generated_pages, repo, repo_url)
+
+        generate_llms_txt(generated_pages, "llms.txt")
+        logger.info("Successfully generated llms.txt")
+
         return result
     except Exception as e:
         logger.error(f"Error processing Github repository {github_event.repository.full_name}: {str(e)}", exc_info=True)
