@@ -61,31 +61,46 @@ class GithubPushEvent(BaseModel):
     
     class Config:
         extra = "ignore"
-    
 
-class WikiStructure:
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        description: str,
-        pages: List[Dict[str, Any]],
-        sections: List[Dict[str, Any]],
-        root_sections: List[str]
-    ):
-        self.id = id
-        self.title = title
-        self.description = description
-        self.pages = pages
-        self.sections = sections
-        self.rootSections = root_sections
 
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "title": self.title,
-            "description": self.description,
-            "pages": self.pages,
-            "sections": self.sections,
-            "rootSections": self.rootSections
-        }
+class WikiPageDetail(BaseModel):
+    """Represents a single page within the wiki structure, including its content."""
+    id: str
+    title: str
+    description: str
+    importance: str # Should ideally be an Enum: 'high', 'medium', 'low'
+    file_paths: List[str] # Renamed from filePaths for consistency
+    related_pages: List[str] # Renamed from relatedPages for consistency
+    content: str = "" # Default to empty string, will be filled in by generation
+
+    class Config:
+        extra = "ignore"
+        # If there's a need to alias filePaths to file_paths during serialization/deserialization
+        # from an external source that uses camelCase, Pydantic v2 allows field_serializer
+        # or alias_generator. For now, keeping it simple.
+
+
+class WikiSection(BaseModel):
+    """Represents a section in the wiki, which can contain pages and subsections."""
+    id: str
+    title: str
+    pages: List[str] # List of page IDs
+    subsections: List[str] = [] # List of subsection IDs, defaults to empty
+
+    class Config:
+        extra = "ignore"
+
+
+class WikiStructure(BaseModel):
+    """
+    Model representing the structure of a generated wiki.
+    """
+    id: str
+    title: str
+    description: str
+    pages: List[WikiPageDetail] # Now a list of Pydantic models
+    sections: List[WikiSection] # Now a list of Pydantic models
+    root_sections: List[str] # Field name changed from rootSections for consistency
+
+    class Config:
+        extra = "ignore"
