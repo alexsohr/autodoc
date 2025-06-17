@@ -22,3 +22,10 @@ dependencies = [
   "aiohttp>=3.8.4",
   "boto3>=1.34.0"
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+python_files = ["*test.py", "test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+asyncio_mode = "auto"
