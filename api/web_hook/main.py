@@ -49,7 +49,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         # Extract GitHub event type from headers
         github_event_type = request.headers.get("X-GitHub-Event")
         logger.info(f"Received GitHub webhook event: {github_event_type}")
-        logger.info(f"Request headers: {request.headers}")
+        logger.debug(f"Request headers: {request.headers}")
 
 
         # Validate HMAC-SHA256 signature
@@ -76,7 +76,6 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
 
         if github_event_type == "pull_request" and \
            github_push_event.action == "closed" and \
-           github_push_event.pull_request and \
            github_push_event.pull_request.merged and \
            github_push_event.pull_request.base.ref == github_push_event.repository.default_branch:
 
