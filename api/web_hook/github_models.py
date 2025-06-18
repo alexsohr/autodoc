@@ -38,7 +38,6 @@ class Base(BaseModel):
     ref: str
 
 class PullRequest(BaseModel):
-    # raw_value: str = Field(..., alias='merged')
     merged: bool
     base: Base
 
@@ -69,8 +68,8 @@ class WikiPageDetail(BaseModel):
     title: str
     description: str
     importance: str # Should ideally be an Enum: 'high', 'medium', 'low'
-    file_paths: List[str] # Renamed from filePaths for consistency
-    related_pages: List[str] # Renamed from relatedPages for consistency
+    file_paths: List[str]
+    related_pages: List[str]
     content: str = "" # Default to empty string, will be filled in by generation
 
     class Config:
@@ -98,9 +97,9 @@ class WikiStructure(BaseModel):
     id: str
     title: str
     description: str
-    pages: List[WikiPageDetail] # Now a list of Pydantic models
-    sections: List[WikiSection] # Now a list of Pydantic models
-    root_sections: List[str] # Field name changed from rootSections for consistency
+    pages: List[WikiPageDetail] # A list of Pydantic models
+    sections: List[WikiSection] # A list of Pydantic models
+    root_sections: List[str]
 
     class Config:
         extra = "ignore"

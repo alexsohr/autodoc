@@ -63,7 +63,7 @@ async def get_repo_file_tree(owner: str, repo: str, default_branch: str) -> str:
                             logger.error(f"Error fetching repository structure for {owner}/{repo} from branch {branch}: {api_error_details}")
                 except Exception as err:
                     logger.error(f"Network error fetching branch {branch} for {owner}/{repo}: {err}")
-                    continue # Try next branch if any
+                    continue
 
         if not tree_data or 'tree' not in tree_data:
             if api_error_details:

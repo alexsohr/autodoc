@@ -6,8 +6,6 @@ import logging
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-
-# Placeholder for models and services that will be in other files
 from api.web_hook.github_models import GithubPushEvent
 from api.web_hook.wiki_generation_service import generate_wiki_for_repository
 
@@ -28,8 +26,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
-
-# Removed placeholder function as it's now imported
 
 @app.post("/webhook")
 async def github_webhook(request: Request, background_tasks: BackgroundTasks):
@@ -83,7 +79,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
 
             # Add the background task for processing
             background_tasks.add_task(
-                generate_wiki_for_repository, # Imported from wiki_generation_service
+                generate_wiki_for_repository,
                 github_event=github_push_event
                 # actor_name can be passed if needed by generate_wiki_for_repository
             )

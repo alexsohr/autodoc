@@ -3,8 +3,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# parse_wiki_pages_from_xml has been removed as its functionality is covered by
-# utils.parse_wiki_structure which returns a comprehensive page list.
 
 def parse_wiki_sections_from_xml(sections_els) -> Tuple[List[Dict], List[str]]:
     """

@@ -8,8 +8,6 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# The FastAPI app instance is now created in main.py
-# from api.web_hook.main import app # No longer needed here if only running uvicorn
 
 if __name__ == "__main__":
     # Get port from environment variable or use default

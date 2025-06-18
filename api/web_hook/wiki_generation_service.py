@@ -8,15 +8,11 @@ from typing import Dict, Any, List
 
 from dotenv import load_dotenv
 
-# Imports from other new modules
 from api.web_hook.github_service import get_repo_file_tree, get_repo_readme
 from api.web_hook.utils import extract_wiki_structure_xml, parse_wiki_structure, generate_llms_txt
-# Imports from existing modules
-# Updated to include WikiPageDetail and WikiSection for Pydantic model instantiation
 from api.web_hook.github_models import GithubPushEvent, WikiStructure, WikiPageDetail, WikiSection
 from api.web_hook.github_prompts import generate_wiki_structure_prompt, generate_wiki_page_prompt
-from api.web_hook.github_api_helpers import parse_wiki_sections_from_xml # parse_wiki_pages_from_xml removed
-# from api.data_pipeline import DatabaseManager # Commented out as per previous steps
+from api.web_hook.github_api_helpers import parse_wiki_sections_from_xml
 
 load_dotenv()
 
@@ -253,12 +249,9 @@ async def generate_wiki_for_repository(github_event: GithubPushEvent, actor_name
             if page_model.id in generated_pages_map and 'content' in generated_pages_map[page_model.id]:
                 page_model.content = generated_pages_map[page_model.id]['content']
 
-        # Step 5: Generate llms.txt (or other outputs)
-        llms_filename = f"{owner}_{repo_name}_llms.txt"
-        # generate_llms_txt expects a map of page_id to page_data (including content)
-        # generated_pages_map is suitable here as it contains the full page dicts with content.
-        generate_llms_txt(generated_pages_map, filename=llms_filename)
-        logger.info(f"Successfully generated {llms_filename} for {repo_full_name}")
+        # Step 5: Generate llms.txt
+        generate_llms_txt(generated_pages_map)
+        logger.info(f"Successfully generated llms.txt for {repo_full_name}")
 
         # TODO: export_wiki_python call will be re-evaluated later.
         # await export_wiki_python(wiki_model_instance, generated_pages_map, repo_name, repo_url)
