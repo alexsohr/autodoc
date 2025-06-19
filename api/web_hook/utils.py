@@ -98,15 +98,15 @@ async def export_wiki_python(
 
     try:
         pages_to_export = []
-        for page_data in wiki_structure.pages: # Assuming wiki_structure.pages is a list of dicts
-            page_id = page_data.get('id')
+        for page_model_instance in wiki_structure.pages:
+            page_id = page_model_instance.id
             content = ""
             if page_id and page_id in generated_pages:
                 content = generated_pages[page_id].get('content', "Content not generated")
 
-            # page_data should already be a dict, spread its contents
+            page_dict_for_export = page_model_instance.model_dump(exclude_none=True)
             pages_to_export.append({
-                **page_data,
+                **page_dict_for_export,
                 'content': content
             })
 
