@@ -63,7 +63,7 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         hash_object = hmac.new(secret.encode('utf-8'), msg=body, digestmod=hashlib.sha256)
         expected_signature = "sha256=" + hash_object.hexdigest()
         if not hmac.compare_digest(expected_signature, signature):
-            logger.error(f"Request signatures didn't match! Expected: {expected_signature}, Got: {signature}")
+            logger.error(f"Request signatures didn't match!")
             raise HTTPException(status_code=403, detail="Request signatures didn't match!")
 
         # Assuming GithubPushEvent is the correct model for 'pull_request' events as well based on previous context
