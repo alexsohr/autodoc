@@ -209,7 +209,7 @@ def generate_llms_txt(data: Dict[str, Dict[str, Any]], filename: str ="llms.txt"
     Each page is formatted with its title, content, importance, related pages, and file paths.
     """
     try:
-        output_dir = "output"
+        output_dir = "repo_wiki_generations"
         os.makedirs(output_dir, exist_ok=True)
         filepath = os.path.join(output_dir, filename)
 
