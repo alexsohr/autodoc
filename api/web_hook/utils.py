@@ -3,7 +3,6 @@ import logging
 import xml.etree.ElementTree as ET
 import os
 import aiohttp
-import json
 from typing import List, Tuple, Dict, Any
 
 # Import models
@@ -241,8 +240,6 @@ def generate_llms_txt(data: Dict[str, Dict[str, Any]], filename: str ="llms.txt"
         logger.info(f"Successfully generated llms.txt at {filepath}")
     except Exception as e:
         logger.error(f"Error generating llms.txt: {e}", exc_info=True)
-
-# from api.web_hook.github_models import WikiStructure # Already imported at the top
 
 # Example usage (for testing, can be removed or kept for utility testing)
 if __name__ == '__main__':
