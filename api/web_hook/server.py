@@ -20,7 +20,7 @@ if __name__ == "__main__":
     # - "api.web_hook.main" is the module path.
     # - "app" is the variable name assigned to FastAPI() in main.py.
     uvicorn.run(
-        "api.web_hook.main:app", # Points to the 'app' instance in 'api/web_hook/main.py'
+        "api.web_hook.app:app", # Points to the 'app' instance in 'api/web_hook/app.py'
         host="0.0.0.0",
         port=webhook_port,
         reload=True, # Reloads the server when code changes, useful for development

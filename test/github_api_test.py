@@ -3,7 +3,7 @@ import json
 import os
 from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
-from api.web_hook.github_api import app, process_github_repository_async
+from api.web_hook.app import app
 
 @pytest.fixture
 def test_client():
@@ -43,9 +43,9 @@ def mock_headers():
 @pytest.mark.asyncio
 async def test_github_webhook_end_to_end(test_client, mock_github_event, mock_headers):
     # Mock the HMAC signature verification
-    with patch('api.web_hook.github_api.hmac.compare_digest', return_value=True):
-        # Mock the process_github_repository_async function
-        with patch('api.web_hook.github_api.process_github_repository_async') as mock_process:
+    with patch('api.web_hook.app.hmac.compare_digest', return_value=True):
+        # Mock the generate_wiki_for_repository function
+        with patch('api.web_hook.app.generate_wiki_for_repository') as mock_process:
             mock_process.return_value = {
                 "wiki_structure": {
                     "title": "Test Wiki",

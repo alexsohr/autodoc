@@ -4,15 +4,15 @@ import logging
 import asyncio
 import websockets
 import xml.etree.ElementTree as ET
-from typing import Dict, Any, List
+from typing import Dict, List
 
 from dotenv import load_dotenv
 
-from api.web_hook.github_service import get_repo_file_tree, get_repo_readme
-from api.web_hook.utils import extract_wiki_structure_xml, parse_wiki_structure, generate_llms_txt
-from api.web_hook.github_models import GithubPushEvent, WikiStructure, WikiPageDetail, WikiSection
-from api.web_hook.github_prompts import generate_wiki_structure_prompt, generate_wiki_page_prompt
-from api.web_hook.github_api_helpers import parse_wiki_sections_from_xml
+from api.web_hook.services.github_api import get_repo_file_tree, get_repo_readme
+from api.web_hook.utils.xml_helpers import extract_wiki_structure_xml, parse_wiki_structure, parse_wiki_sections_from_xml
+from api.web_hook.utils.export_utils import generate_llms_txt
+from api.web_hook.models.github_events import GithubPushEvent, WikiStructure, WikiPageDetail, WikiSection
+from api.web_hook.prompts.wiki_templates import generate_wiki_structure_prompt, generate_wiki_page_prompt
 
 load_dotenv()
 

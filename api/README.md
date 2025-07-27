@@ -112,7 +112,7 @@ This allows you to maintain different configurations for various environments or
 # From the project root
 python -m api.main
 # To start the github webhook server
-python -m api.web_hook.github_api
+python -m api.web_hook.server
 ```
 
 The API will be available at `http://localhost:8001`

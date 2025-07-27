@@ -6,8 +6,8 @@ import logging
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from api.web_hook.github_models import GithubPushEvent
-from api.web_hook.wiki_generation_service import generate_wiki_for_repository
+from api.web_hook.models.github_events import GithubPushEvent
+from api.web_hook.services.wiki_generator import generate_wiki_for_repository
 
 # Configure logger
 logger = logging.getLogger(__name__)
