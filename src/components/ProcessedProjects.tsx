@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { FaTimes, FaTh, FaList } from 'react-icons/fa';
+import { FaTimes, FaTh, FaList, FaCog } from 'react-icons/fa';
+import MCPConfigModal from './MCPConfigModal';
 
 // Interface should match the structure from the API
 interface ProcessedProject {
@@ -33,6 +34,8 @@ export default function ProcessedProjects({
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [selectedProject, setSelectedProject] = useState<ProcessedProject | null>(null);
+  const [isMCPModalOpen, setIsMCPModalOpen] = useState(false);
 
   // Default messages fallback
   const defaultMessages = {
@@ -127,6 +130,18 @@ export default function ProcessedProjects({
     }
   };
 
+  const handleMCPConfig = (project: ProcessedProject, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedProject(project);
+    setIsMCPModalOpen(true);
+  };
+
+  const handleCloseMCPModal = () => {
+    setIsMCPModalOpen(false);
+    setSelectedProject(null);
+  };
+
   return (
     <div className={`${className}`}>
       {showHeader && (
@@ -196,14 +211,24 @@ export default function ProcessedProjects({
             {filteredProjects.map((project) => (
             viewMode === 'card' ? (
               <div key={project.id} className="relative p-4 border border-[var(--border-color)] rounded-lg bg-[var(--card-bg)] shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02]">
-                <button
-                  type="button"
-                  onClick={() => handleDelete(project)}
-                  className="absolute top-2 right-2 text-[var(--muted)] hover:text-[var(--foreground)]"
-                  title="Delete project"
-                >
-                  <FaTimes className="h-4 w-4" />
-                </button>
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => handleMCPConfig(project, e)}
+                    className="text-[var(--muted)] hover:text-[var(--accent-primary)] transition-colors"
+                    title="Get MCP Config"
+                  >
+                    <FaCog className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(project)}
+                    className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                    title="Delete project"
+                  >
+                    <FaTimes className="h-4 w-4" />
+                  </button>
+                </div>
                 <Link
                   href={`/${project.owner}/${project.repo}?type=${project.repo_type}&language=${project.language}`}
                   className="block"
@@ -226,14 +251,24 @@ export default function ProcessedProjects({
               </div>
             ) : (
               <div key={project.id} className="relative p-3 border border-[var(--border-color)] rounded-lg bg-[var(--card-bg)] hover:bg-[var(--background)] transition-colors">
-                <button
-                  type="button"
-                  onClick={() => handleDelete(project)}
-                  className="absolute top-2 right-2 text-[var(--muted)] hover:text-[var(--foreground)]"
-                  title="Delete project"
-                >
-                  <FaTimes className="h-4 w-4" />
-                </button>
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => handleMCPConfig(project, e)}
+                    className="text-[var(--muted)] hover:text-[var(--accent-primary)] transition-colors"
+                    title="Get MCP Config"
+                  >
+                    <FaCog className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(project)}
+                    className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                    title="Delete project"
+                  >
+                    <FaTimes className="h-4 w-4" />
+                  </button>
+                </div>
                 <Link
                   href={`/${project.owner}/${project.repo}?type=${project.repo_type}&language=${project.language}`}
                   className="flex items-center justify-between"
@@ -264,6 +299,15 @@ export default function ProcessedProjects({
 
       {!isLoading && !error && projects.length === 0 && (
         <p className="text-[var(--muted)]">{t('noProjects')}</p>
+      )}
+
+      {/* MCP Configuration Modal */}
+      {selectedProject && (
+        <MCPConfigModal
+          isOpen={isMCPModalOpen}
+          onClose={handleCloseMCPModal}
+          project={selectedProject}
+        />
       )}
     </div>
   );

@@ -57,14 +57,30 @@ COPY --from=node_builder /app/.next/standalone ./
 COPY --from=node_builder /app/.next/static ./.next/static
 
 # Expose the port the app runs on
-EXPOSE ${PORT:-8001} 3000
+EXPOSE ${PORT:-8001} ${NEXT_PORT:-3000}
 
-# Create a script to run both backend and frontend
+# Create a script to run both backend and frontend with proper process management
 RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+# Function to cleanup processes on exit\n\
+cleanup() {\n\
+    echo "Shutting down services..."\n\
+    jobs -p | xargs -r kill\n\
+    exit\n\
+}\n\
+\n\
+# Set up signal handlers\n\
+trap cleanup SIGTERM SIGINT\n\
+\n\
 # Load environment variables from .env file if it exists\n\
 if [ -f .env ]; then\n\
   export $(grep -v "^#" .env | xargs -r)\n\
 fi\n\
+\n\
+# Set default port values\n\
+export API_PORT=${PORT:-8001}\n\
+export NEXT_PORT=${NEXT_PORT:-3000}\n\
 \n\
 # Check for required environment variables\n\
 if [ -z "$OPENAI_API_KEY" ] || [ -z "$GOOGLE_API_KEY" ]; then\n\
@@ -73,14 +89,31 @@ if [ -z "$OPENAI_API_KEY" ] || [ -z "$GOOGLE_API_KEY" ]; then\n\
   echo "You can provide them via a mounted .env file or as environment variables when running the container."\n\
 fi\n\
 \n\
-# Start the API server in the background with the configured port\n\
-python -m api.main --port ${PORT:-8001} &\n\
-PORT=3000 HOSTNAME=0.0.0.0 node server.js &\n\
+echo "Starting API server on port $API_PORT..."\n\
+python -m api.main --port $API_PORT &\n\
+API_PID=$!\n\
+\n\
+# Wait a moment for API server to start\n\
+sleep 2\n\
+\n\
+echo "Starting Next.js server on port $NEXT_PORT..."\n\
+PORT=$NEXT_PORT HOSTNAME=0.0.0.0 node server.js &\n\
+NEXT_PID=$!\n\
+\n\
+echo "Services started - API PID: $API_PID, Next.js PID: $NEXT_PID"\n\
+echo "API available at: http://0.0.0.0:$API_PORT"\n\
+echo "Frontend available at: http://0.0.0.0:$NEXT_PORT"\n\
+\n\
+# Wait for any process to exit\n\
 wait -n\n\
-exit $?' > /app/start.sh && chmod +x /app/start.sh
+\n\
+# If we get here, one of the processes has exited\n\
+echo "One of the services has stopped. Shutting down..."\n\
+cleanup' > /app/start.sh && chmod +x /app/start.sh
 
 # Set environment variables
 ENV PORT=8001
+ENV NEXT_PORT=3000
 ENV NODE_ENV=production
 ENV SERVER_BASE_URL=http://localhost:${PORT:-8001}
 
