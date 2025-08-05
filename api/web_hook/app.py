@@ -104,6 +104,3 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         logger.error(f"Error processing webhook: {str(e)}", exc_info=True)
         # Return a generic 500 error for unhandled exceptions
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-# Note: The uvicorn run command will remain in github_api.py for now,
-# but will be updated to run this app: "api.web_hook.main:app"
