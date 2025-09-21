@@ -64,3 +64,8 @@ yarn-error.log*
 next-env.d.ts
 
 .idea/
+.vscode/settings.json
+yarn.lock
+
+# Generated wiki content
+repo_wiki_generations/
